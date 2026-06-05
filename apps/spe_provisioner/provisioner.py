@@ -48,9 +48,12 @@ def provision(permit_id: str, db_user: str, db_password: str) -> dict:
         try:
             pg = client.containers.get(POSTGRES_CONTAINER)
             old_net.disconnect(pg, force=True)
-        except docker.errors.NotFound:
+        except (docker.errors.NotFound, docker.errors.APIError):
             pass
-        old_net.remove()
+        try:
+            old_net.remove()
+        except docker.errors.APIError:
+            pass
     except docker.errors.NotFound:
         pass
     network = client.networks.create(net_name, driver="bridge", internal=True)

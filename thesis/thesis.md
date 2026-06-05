@@ -121,6 +121,17 @@ Files failing any check are `blocked` immediately. Files passing enter `pending_
 
 All 47 tests pass.
 
+### Performance
+
+Measured on a local development machine (Intel i7, Docker Desktop):
+
+| Operation | Time | Notes |
+|-----------|------|-------|
+| SPE provisioning (`POST /spe`) | 327 ms | Docker network create + container start + Postgres user/view setup |
+| Airlock submission + automated checks (`POST /submissions`) | 75 ms | CSV small-cell + ID-column check on a 100-row file |
+
+Both operations are fast enough for interactive use. SPE provisioning is a one-time cost per permit; the 327 ms includes creating the Docker network, connecting Postgres, launching the JupyterLab container, and setting up the permit-scoped schema. The 75 ms airlock figure covers multipart upload parsing, running all four check functions, and persisting the result to Postgres.
+
 ### Adversarial exfiltration attempts
 
 | Attack | Blocked by |

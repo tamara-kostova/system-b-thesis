@@ -27,6 +27,22 @@ tab_apply, tab_my = st.tabs(["New Application", "My Applications"])
 
 with tab_apply:
     st.subheader("Submit a Data Access Application")
+
+    # EHDS Article 54 — prohibited use screen
+    st.markdown("#### EHDS Article 54 — Prohibited Uses")
+    st.caption("Confirm that your intended use does **not** include any of the following:")
+    prohibited = [
+        "Taking decisions detrimental to individuals based on their health data",
+        "Producing advertising or marketing for products targeted at individuals",
+        "Developing products or services that may harm individuals or public health",
+        "Profiling of individuals for insurance pricing or similar purposes",
+        "Using data for purposes not specified in the application",
+    ]
+    prohibited_ticked = [st.checkbox(item, key=f"prohibited_{i}") for i, item in enumerate(prohibited)]
+    if any(prohibited_ticked):
+        st.error("Your application cannot proceed: one or more prohibited uses are selected (EHDS Article 54).")
+        st.stop()
+
     with st.form("application_form"):
         access_type = st.radio("Access type", ["request", "permit"],
                                help="Request = aggregated counts only. Permit = full SPE access.")
