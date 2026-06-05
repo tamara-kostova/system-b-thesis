@@ -1,0 +1,24 @@
+FROM python:3.12-slim
+
+RUN pip install --no-cache-dir \
+    jupyterlab==4.* \
+    pandas \
+    sqlalchemy \
+    psycopg2-binary \
+    ipykernel
+
+# Audit hook: log every notebook save to stdout (captured by Docker as container logs)
+COPY spe_jupyter_config.py /root/.jupyter/jupyter_server_config.py
+
+# Starter notebook pre-loaded with the DB connection snippet
+COPY spe_starter.ipynb /home/jovyan/starter.ipynb
+
+WORKDIR /home/jovyan
+
+CMD jupyter lab \
+    --ip=0.0.0.0 \
+    --port=8888 \
+    --no-browser \
+    --allow-root \
+    --IdentityProvider.token="${JUPYTER_TOKEN}" \
+    --ServerApp.allow_origin='*'
