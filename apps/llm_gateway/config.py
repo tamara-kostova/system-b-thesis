@@ -19,7 +19,8 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.2"
 
-    discovery_api_url: str = "http://localhost:8001"
+    discovery_api_url: str = "http://localhost:8003"
+    permit_service_url: str = "http://localhost:8002"
 
 
 settings = Settings()
