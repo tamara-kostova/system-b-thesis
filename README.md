@@ -2,8 +2,6 @@
 
 A reference implementation of an EHDS (European Health Data Space) Chapter IV-compliant platform for secondary use of health data, with an LLM-assisted prompt interface validated against the OMOP CDM v5.4 standard.
 
-Built as a master's thesis project.
-
 ## Architecture
 
 Five services built in phases:
