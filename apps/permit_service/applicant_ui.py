@@ -30,7 +30,7 @@ with tab_apply:
 
     # EHDS Article 54 — prohibited use screen
     st.markdown("#### EHDS Article 54 — Prohibited Uses")
-    st.caption("Confirm that your intended use does **not** include any of the following:")
+    st.caption("Your application may not be used for any of the following purposes:")
     prohibited = [
         "Taking decisions detrimental to individuals based on their health data",
         "Producing advertising or marketing for products targeted at individuals",
@@ -38,9 +38,14 @@ with tab_apply:
         "Profiling of individuals for insurance pricing or similar purposes",
         "Using data for purposes not specified in the application",
     ]
-    prohibited_ticked = [st.checkbox(item, key=f"prohibited_{i}") for i, item in enumerate(prohibited)]
-    if any(prohibited_ticked):
-        st.error("Your application cannot proceed: one or more prohibited uses are selected (EHDS Article 54).")
+    for item in prohibited:
+        st.markdown(f"- {item}")
+    confirmed = st.checkbox(
+        "I confirm that my intended use does **not** include any of the above (EHDS Article 54)",
+        key="prohibited_confirm",
+    )
+    if not confirmed:
+        st.warning("You must confirm compliance with EHDS Article 54 before submitting.")
         st.stop()
 
     with st.form("application_form"):
