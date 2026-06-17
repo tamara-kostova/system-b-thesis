@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, Text, Date, DateTime, JSON
 from sqlalchemy import event
 from sqlalchemy.orm import Session
@@ -27,8 +27,8 @@ class PermitDB(Base):
     omop_snapshot         = Column(String(50),  nullable=False, default="synthea-omop-v1")
     vocab_version         = Column(String(50),  nullable=False, default="5.4")
     reviewer_comment      = Column(Text,        nullable=True)
-    created_at            = Column(DateTime,    nullable=False, default=datetime.utcnow)
-    updated_at            = Column(DateTime,    nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at            = Column(DateTime,    nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at            = Column(DateTime,    nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 def create_tables():

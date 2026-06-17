@@ -157,3 +157,67 @@ def test_run_checks_unknown_extension_fails():
 def test_all_passed_helper():
     assert all_passed([("a", True, "ok"), ("b", True, "ok")])
     assert not all_passed([("a", True, "ok"), ("b", False, "fail")])
+
+
+# ── Airlock state guard ───────────────────────────────────────────────────────
+
+import os as _os
+_os.environ.setdefault("REVIEWER_PASSWORD", "test-password")
+
+
+def test_blocked_submission_cannot_be_approved():
+    """Attack: try to approve a submission that failed automated checks."""
+    from fastapi.testclient import TestClient
+    from unittest.mock import MagicMock, patch
+    from apps.output_airlock.models import AirlockSubmissionDB
+    from shared.db import get_db
+    import uuid
+
+    blocked = AirlockSubmissionDB()
+    blocked.submission_id = uuid.uuid4()
+    blocked.state = "blocked"
+    blocked.filename = "bad.csv"
+
+    mock_db = MagicMock()
+    mock_db.get.return_value = blocked
+
+    with patch("apps.output_airlock.main.create_tables"):
+        from apps.output_airlock.main import app
+        app.dependency_overrides[get_db] = lambda: mock_db
+        try:
+            client = TestClient(app)
+            resp = client.post(
+                f"/submissions/{blocked.submission_id}/approve",
+                json={"reviewer": "reviewer", "password": "test-password", "comment": ""},
+            )
+            assert resp.status_code == 400
+            assert "blocked" in resp.json()["detail"].lower()
+        finally:
+            app.dependency_overrides.clear()
+
+
+def test_non_approved_submission_cannot_be_downloaded():
+    """Only approved submissions can be downloaded."""
+    from fastapi.testclient import TestClient
+    from unittest.mock import MagicMock, patch
+    from apps.output_airlock.models import AirlockSubmissionDB
+    from shared.db import get_db
+    import uuid
+
+    sub = AirlockSubmissionDB()
+    sub.submission_id = uuid.uuid4()
+    sub.state = "pending_review"
+    sub.filename = "results.csv"
+
+    mock_db = MagicMock()
+    mock_db.get.return_value = sub
+
+    with patch("apps.output_airlock.main.create_tables"):
+        from apps.output_airlock.main import app
+        app.dependency_overrides[get_db] = lambda: mock_db
+        try:
+            client = TestClient(app)
+            resp = client.get(f"/submissions/{sub.submission_id}/download")
+            assert resp.status_code == 403
+        finally:
+            app.dependency_overrides.clear()

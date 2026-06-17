@@ -57,11 +57,11 @@ Prefer pandas aggregations. Always explain what the code does.
 
 # Common national ID patterns: SSN (US), BSN (NL), NIN (UK), CPR (DK), PPS (IE)
 _PII_PATTERNS = [
-    re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),           # SSN
-    re.compile(r"\b\d{9}\b"),                          # BSN / generic 9-digit
-    re.compile(r"\b[A-Z]{2}\d{6}[A-Z]\b"),            # UK NIN
-    re.compile(r"\b\d{6}-\d{4}\b"),                   # CPR (DK)
-    re.compile(r"\b\d{7}[A-Z]{1,2}\b"),               # PPS (IE)
+    re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),                               # SSN (US)
+    re.compile(r"(?i)\b(?:bsn|burgerservicenummer)\s*[:#=]?\s*\d{9}\b"), # BSN (NL) with label
+    re.compile(r"\b[A-Z]{2}\d{6}[A-Z]\b"),                               # UK NIN
+    re.compile(r"\b\d{6}-\d{4}\b"),                                       # CPR (DK)
+    re.compile(r"\b\d{7}[A-Z]{1,2}\b"),                                   # PPS (IE)
 ]
 
 

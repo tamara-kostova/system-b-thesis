@@ -9,23 +9,14 @@ Every state transition is a method that:
 No state change happens outside this class.
 """
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from sqlalchemy.orm import Session
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 from shared.audit import log_event
+from shared.models import PERMIT_TRANSITIONS as TRANSITIONS
 from apps.permit_service.models import PermitDB
-
-
-TRANSITIONS: dict[str, list[str]] = {
-    "draft":        ["submitted"],
-    "submitted":    ["under_review", "refused"],
-    "under_review": ["granted", "refused"],
-    "granted":      ["expired"],
-    "refused":      [],
-    "expired":      [],
-}
 
 
 class IllegalTransitionError(ValueError):
@@ -45,7 +36,7 @@ class PermitStateMachine:
             )
         old_state = self.permit.state
         self.permit.state = new_state
-        self.permit.updated_at = datetime.utcnow()
+        self.permit.updated_at = datetime.now(timezone.utc)
         log_event(
             event_type=f"permit.{new_state}",
             actor=actor,

@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Column, String, Boolean, LargeBinary, DateTime, Text, JSON
 from sqlalchemy.dialects.postgresql import UUID
@@ -24,7 +24,7 @@ class AirlockSubmissionDB(Base):
     state               = Column(String, nullable=False, default="pending_review")
     reviewer            = Column(String, nullable=True)
     reviewer_comment    = Column(Text, nullable=True)
-    submitted_at        = Column(DateTime, default=datetime.utcnow, nullable=False)
+    submitted_at        = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     reviewed_at         = Column(DateTime, nullable=True)
 
 
@@ -32,4 +32,4 @@ def create_tables():
     with engine.connect() as conn:
         conn.execute(__import__("sqlalchemy").text("CREATE SCHEMA IF NOT EXISTS airlock"))
         conn.commit()
-    Base.metadata.create_all(engine)
+    Base.metadata.create_all(engine, tables=[AirlockSubmissionDB.__table__])

@@ -5,6 +5,7 @@ the rest of the gateway never needs to know which one is active.
 Ollama uses OpenAI's client pointed at localhost — no extra SDK needed.
 """
 
+import functools
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -144,6 +145,7 @@ class OllamaProvider(_OpenAICompatibleProvider):
         )
 
 
+@functools.lru_cache(maxsize=1)
 def get_provider() -> LLMProvider:
     match settings.llm_provider:
         case "anthropic":

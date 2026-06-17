@@ -9,11 +9,12 @@ EHDS Articles 50 (output checking) and 73 (audit).
 
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form
 from fastapi.responses import Response
 from pydantic import BaseModel
@@ -28,15 +29,26 @@ from shared.audit import log_event
 from apps.output_airlock.models import AirlockSubmissionDB, create_tables
 from apps.output_airlock.checks import run_checks, all_passed
 
-create_tables()
+
+@asynccontextmanager
+async def lifespan(app):
+    create_tables()
+    yield
+
 
 app = FastAPI(
     title="Output Airlock",
     description="Disclosure-control gateway for SPE output candidates. EHDS Articles 50 & 73.",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
-REVIEWER_PASSWORD = os.getenv("REVIEWER_PASSWORD", "reviewer123")
+REVIEWER_PASSWORD = os.getenv("REVIEWER_PASSWORD")
+if not REVIEWER_PASSWORD:
+    raise RuntimeError(
+        "REVIEWER_PASSWORD environment variable is not set. "
+        "Add it to your .env file before starting the airlock service."
+    )
 
 
 # ── Pydantic response models ──────────────────────────────────────────────────
@@ -152,7 +164,7 @@ def approve(submission_id: str, body: ReviewBody, db: Session = Depends(get_db))
     s.state = "approved"
     s.reviewer = body.reviewer
     s.reviewer_comment = body.comment or None
-    s.reviewed_at = datetime.utcnow()
+    s.reviewed_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(s)
 
@@ -174,7 +186,7 @@ def reject(submission_id: str, body: ReviewBody, db: Session = Depends(get_db)):
     s.state = "rejected"
     s.reviewer = body.reviewer
     s.reviewer_comment = body.comment or None
-    s.reviewed_at = datetime.utcnow()
+    s.reviewed_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(s)
 
@@ -184,14 +196,14 @@ def reject(submission_id: str, body: ReviewBody, db: Session = Depends(get_db)):
 
 
 @app.get("/submissions/{submission_id}/download")
-def download(submission_id: str, db: Session = Depends(get_db)):
+def download(submission_id: str, requester: str = "anonymous", db: Session = Depends(get_db)):
     s = db.get(AirlockSubmissionDB, submission_id)
     if not s:
         raise HTTPException(404, "Submission not found")
     if s.state != "approved":
         raise HTTPException(403, "Only approved submissions can be downloaded")
 
-    log_event("airlock.downloaded", actor="researcher", resource_id=submission_id,
+    log_event("airlock.downloaded", actor=requester, resource_id=submission_id,
               details={"filename": s.filename})
 
     return Response(

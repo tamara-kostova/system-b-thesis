@@ -3,12 +3,13 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
+import requests
 import streamlit as st
-from shared.db import SessionLocal
-from apps.permit_service.models import PermitDB, create_tables
-from apps.permit_service.state_machine import PermitStateMachine, IllegalTransitionError
+from dotenv import load_dotenv
+from pathlib import Path
 
-create_tables()
+load_dotenv(Path(__file__).parent.parent.parent / ".env")
+PERMIT_SERVICE_URL = os.getenv("PERMIT_SERVICE_URL", "http://localhost:8004")
 
 st.set_page_config(page_title="Apply for Data Access", layout="wide")
 
@@ -81,57 +82,49 @@ with tab_apply:
 
         named_users = [u.strip() for u in named_users_raw.split(",") if u.strip()]
 
-        db = SessionLocal()
         try:
-            permit = PermitDB(
-                type=access_type,
-                holder=st.session_state["username"],
-                named_users=named_users,
-                purpose=purpose,
-                data_scope={
+            resp = requests.post(f"{PERMIT_SERVICE_URL}/permits", json={
+                "type": access_type,
+                "holder": st.session_state["username"],
+                "named_users": named_users,
+                "purpose": purpose,
+                "data_scope": {
                     "domains": domains,
                     "concept_ids": concept_ids,
                     "time_window_from": str(time_from),
                     "time_window_until": str(time_until),
                 },
-                format=fmt,
-                pseudonymization_justification=pseudo_justification,
-            )
-            db.add(permit)
-            db.commit()
-            PermitStateMachine(permit, db).submit(st.session_state["username"])
-            st.success(f"Application submitted. ID: `{permit.permit_id}`")
-        finally:
-            db.close()
+                "format": fmt,
+                "pseudonymization_justification": pseudo_justification,
+            })
+            resp.raise_for_status()
+            permit_id = resp.json()["permit_id"]
+
+            sub_resp = requests.post(f"{PERMIT_SERVICE_URL}/permits/{permit_id}/submit", json={
+                "actor": st.session_state["username"]
+            })
+            sub_resp.raise_for_status()
+            st.success(f"Application submitted. ID: `{permit_id}`")
+        except requests.HTTPError as e:
+            st.error(f"Submission failed: {e.response.text}")
+        except requests.ConnectionError:
+            st.error(f"Cannot reach permit service at {PERMIT_SERVICE_URL}")
 
 with tab_my:
     st.subheader("My Applications")
-    db = SessionLocal()
     try:
-        permits = (
-            db.query(PermitDB)
-            .filter(PermitDB.holder == st.session_state["username"])
-            .order_by(PermitDB.created_at.desc())
-            .all()
-        )
-    finally:
-        db.close()
+        resp = requests.get(f"{PERMIT_SERVICE_URL}/permits", params={"holder": st.session_state["username"]})
+        resp.raise_for_status()
+        permits = resp.json()
+    except Exception as e:
+        st.error(f"Cannot load applications: {e}")
+        permits = []
 
     if not permits:
         st.info("No applications yet.")
     else:
         for p in permits:
             state_color = {"granted": "🟢", "refused": "🔴", "submitted": "🟡",
-                           "under_review": "🔵", "draft": "⚪", "expired": "⚫"}.get(p.state, "")
-            with st.expander(f"{state_color} {p.permit_id[:8]}... — {p.purpose} — {p.state}"):
-                st.json({
-                    "permit_id": p.permit_id,
-                    "type": p.type,
-                    "purpose": p.purpose,
-                    "state": p.state,
-                    "data_scope": p.data_scope,
-                    "format": p.format,
-                    "valid_from": str(p.valid_from),
-                    "valid_until": str(p.valid_until),
-                    "reviewer_comment": p.reviewer_comment,
-                })
+                           "under_review": "🔵", "draft": "⚪", "expired": "⚫"}.get(p["state"], "")
+            with st.expander(f"{state_color} {p['permit_id'][:8]}... — {p['purpose']} — {p['state']}"):
+                st.json(p)
