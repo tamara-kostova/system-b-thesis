@@ -1,4 +1,5 @@
 from datetime import date
+from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -23,12 +24,12 @@ class DataScopeIn(BaseModel):
 
 
 class PermitCreate(BaseModel):
-    type: str
+    type: Literal["request", "permit"]
     holder: str
     named_users: list[str] = []
-    purpose: str
+    purpose: Literal["public_health", "policy", "statistics", "education", "research", "innovation"]
     data_scope: DataScopeIn
-    format: str
+    format: Literal["anonymized", "pseudonymized"]
     pseudonymization_justification: str | None = None
 
 
@@ -107,10 +108,12 @@ def create_permit(body: PermitCreate, db: Session = Depends(get_db)):
 
 
 @router.get("", response_model=list[PermitOut])
-def list_permits(state: str | None = None, db: Session = Depends(get_db)):
+def list_permits(state: str | None = None, holder: str | None = None, db: Session = Depends(get_db)):
     q = db.query(PermitDB)
     if state:
         q = q.filter(PermitDB.state == state)
+    if holder:
+        q = q.filter(PermitDB.holder == holder)
     return [PermitOut.from_db(p) for p in q.order_by(PermitDB.created_at.desc())]
 
 

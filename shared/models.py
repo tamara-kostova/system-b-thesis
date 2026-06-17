@@ -3,6 +3,16 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
+PERMIT_TRANSITIONS: dict[str, list[str]] = {
+    "draft":        ["submitted"],
+    "submitted":    ["under_review", "refused"],
+    "under_review": ["granted", "refused"],
+    "granted":      ["expired"],
+    "refused":      [],
+    "expired":      [],
+}
+
+
 class DataScope(BaseModel):
     domains: list[str]
     concept_ids: list[int]
@@ -31,15 +41,7 @@ class Permit(BaseModel):
     omop_snapshot: str
     vocab_version: str
 
-    # Legal permit state transitions only
-    _TRANSITIONS: dict[str, list[str]] = {
-        "draft": ["submitted"],
-        "submitted": ["under_review", "refused"],
-        "under_review": ["granted", "refused"],
-        "granted": ["expired"],
-        "refused": [],
-        "expired": [],
-    }
+    _TRANSITIONS = PERMIT_TRANSITIONS
 
     def can_transition_to(self, new_state: str) -> bool:
-        return new_state in self._TRANSITIONS.get(self.state, [])
+        return new_state in PERMIT_TRANSITIONS.get(self.state, [])

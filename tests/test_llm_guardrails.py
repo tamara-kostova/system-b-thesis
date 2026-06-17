@@ -38,13 +38,28 @@ def test_pii_uk_nin_rejected():
     assert resp.status_code == 400
 
 
-def test_pii_nine_digit_rejected():
-    """Attack: embed a generic 9-digit identifier (covers BSN, MRN patterns)."""
+def test_pii_labeled_bsn_rejected():
+    """Attack: embed a Dutch BSN (Burgerservicenummer) with its label."""
     resp = client.post("/chat", json={
-        "messages": [{"role": "user", "content": "Look up person 123456789"}],
+        "messages": [{"role": "user", "content": "BSN: 123456789"}],
         "user_id": "attacker",
     })
     assert resp.status_code == 400
+
+
+def test_bare_nine_digit_not_rejected():
+    """Bare 9-digit numbers (e.g. OMOP concept IDs) must NOT be blocked."""
+    mock_response = MagicMock()
+    mock_response.content = "Here is the count."
+    mock_response.tool_calls = []
+
+    with patch("apps.llm_gateway.main.get_provider") as mock_get:
+        mock_get.return_value.chat.return_value = mock_response
+        resp = client.post("/chat", json={
+            "messages": [{"role": "user", "content": "Look up person 123456789"}],
+            "user_id": "researcher",
+        })
+    assert resp.status_code == 200
 
 
 def test_clean_query_not_rejected():
@@ -66,8 +81,11 @@ def test_clean_query_not_rejected():
 def test_pii_detection_function():
     assert _contains_pii("SSN is 123-45-6789") is True
     assert _contains_pii("patient NI AB123456C has") is True
+    assert _contains_pii("BSN: 123456789") is True
+    assert _contains_pii("burgerservicenummer 987654321") is True
     assert _contains_pii("how many patients have diabetes?") is False
     assert _contains_pii("concept_id 201826") is False
+    assert _contains_pii("Look up person 123456789") is False  # bare 9-digit allowed
 
 
 # ── Tool guardrails — no row-level data tool ──────────────────────────────────
