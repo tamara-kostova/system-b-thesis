@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class _DBSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-    database_url: str = "postgresql://omop_admin:changeme@localhost:5432/omop"
+    database_url: str = "postgresql://omop_admin:changeme@localhost:5433/omop"
 
 
 _settings = _DBSettings()

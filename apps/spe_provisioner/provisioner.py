@@ -44,16 +44,15 @@ def provision(permit_id: str, db_user: str, db_password: str) -> dict:
     # 1. Internal network — no internet egress
     try:
         old_net = client.networks.get(net_name)
-        # Leftover from a previous failed attempt — disconnect all endpoints then remove
-        try:
-            pg = client.containers.get(POSTGRES_CONTAINER)
-            old_net.disconnect(pg, force=True)
-        except (docker.errors.NotFound, docker.errors.APIError):
-            pass
-        try:
-            old_net.remove()
-        except docker.errors.APIError:
-            pass
+        old_net.reload()
+        # Disconnect every container still attached — not just Postgres
+        for attrs in list(old_net.attrs.get("Containers", {}).values()):
+            try:
+                ctr = client.containers.get(attrs["Name"].lstrip("/"))
+                old_net.disconnect(ctr, force=True)
+            except (docker.errors.NotFound, docker.errors.APIError):
+                pass
+        old_net.remove()
     except docker.errors.NotFound:
         pass
     network = client.networks.create(net_name, driver="bridge", internal=True)

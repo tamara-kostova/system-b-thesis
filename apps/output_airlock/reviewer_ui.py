@@ -92,7 +92,11 @@ def _render_submission(s: dict, show_actions: bool = False):
 
 with tab_pending:
     try:
-        subs = requests.get(f"{AIRLOCK_URL}/submissions?state=pending_review").json()
+        resp = requests.get(f"{AIRLOCK_URL}/submissions?state=pending_review")
+        subs = resp.json() if resp.ok else []
+        if not isinstance(subs, list):
+            st.error(f"Airlock service error: {subs}")
+            subs = []
     except Exception as e:
         st.error(f"Cannot reach airlock service: {e}")
         subs = []
@@ -111,7 +115,11 @@ with tab_pending:
 
 with tab_all:
     try:
-        all_subs = requests.get(f"{AIRLOCK_URL}/submissions").json()
+        resp = requests.get(f"{AIRLOCK_URL}/submissions")
+        all_subs = resp.json() if resp.ok else []
+        if not isinstance(all_subs, list):
+            st.error(f"Airlock service error: {all_subs}")
+            all_subs = []
     except Exception as e:
         st.error(f"Cannot reach airlock service: {e}")
         all_subs = []

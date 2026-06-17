@@ -46,13 +46,14 @@ class PermitStateMachine:
         old_state = self.permit.state
         self.permit.state = new_state
         self.permit.updated_at = datetime.utcnow()
-        self.db.commit()
         log_event(
             event_type=f"permit.{new_state}",
             actor=actor,
             resource_id=self.permit.permit_id,
             details={"from": old_state, "to": new_state, **(details or {})},
+            db=self.db,
         )
+        self.db.commit()
 
     def submit(self, actor: str):
         self._transition("submitted", actor)

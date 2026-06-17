@@ -1,5 +1,5 @@
 import pytest
-from apps.discovery_api.suppression import suppress, THRESHOLD
+from shared.suppression import suppress, THRESHOLD
 
 
 def test_exact_threshold_not_suppressed():

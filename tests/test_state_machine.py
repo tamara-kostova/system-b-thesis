@@ -1,6 +1,6 @@
 import pytest
 from datetime import date
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from apps.permit_service.state_machine import PermitStateMachine, IllegalTransitionError, TRANSITIONS
 from apps.permit_service.models import PermitDB
@@ -87,3 +87,55 @@ def test_granted_cannot_be_submitted():
 # Verify all defined transitions are tested
 def test_transitions_table_complete():
     assert set(TRANSITIONS.keys()) == {"draft", "submitted", "under_review", "granted", "refused", "expired"}
+
+
+# Audit event assertions — a refactor that drops log_event should fail these
+
+def test_submit_writes_audit_event():
+    with patch("apps.permit_service.state_machine.log_event") as mock_log:
+        sm = make_sm("draft")
+        sm.submit("applicant@example.com")
+        mock_log.assert_called_once()
+        call_kwargs = mock_log.call_args.kwargs
+        assert call_kwargs["event_type"] == "permit.submitted"
+        assert call_kwargs["actor"] == "applicant@example.com"
+        assert call_kwargs["resource_id"] == "test-permit-id"
+        assert call_kwargs["details"]["from"] == "draft"
+        assert call_kwargs["details"]["to"] == "submitted"
+        assert call_kwargs["db"] is sm.db
+
+
+def test_grant_writes_audit_event():
+    with patch("apps.permit_service.state_machine.log_event") as mock_log:
+        sm = make_sm("under_review")
+        sm.grant("reviewer", date(2026, 1, 1), date(2026, 12, 31))
+        mock_log.assert_called_once()
+        call_kwargs = mock_log.call_args.kwargs
+        assert call_kwargs["event_type"] == "permit.granted"
+        assert call_kwargs["actor"] == "reviewer"
+
+
+def test_refuse_writes_audit_event():
+    with patch("apps.permit_service.state_machine.log_event") as mock_log:
+        sm = make_sm("under_review")
+        sm.refuse("reviewer", "Does not meet Article 53 criteria")
+        mock_log.assert_called_once()
+        call_kwargs = mock_log.call_args.kwargs
+        assert call_kwargs["event_type"] == "permit.refused"
+        assert call_kwargs["details"]["comment"] == "Does not meet Article 53 criteria"
+
+
+def test_illegal_transition_does_not_write_audit():
+    with patch("apps.permit_service.state_machine.log_event") as mock_log:
+        with pytest.raises(IllegalTransitionError):
+            make_sm("draft").grant("reviewer", date.today(), date.today())
+        mock_log.assert_not_called()
+
+
+def test_grant_valid_until_before_valid_from_is_accepted_by_state_machine():
+    """State machine does not validate date ordering — documents the gap."""
+    with patch("apps.permit_service.state_machine.log_event"):
+        sm = make_sm("under_review")
+        sm.grant("reviewer", date(2026, 12, 31), date(2026, 1, 1))
+        assert sm.permit.valid_from == date(2026, 12, 31)
+        assert sm.permit.valid_until == date(2026, 1, 1)

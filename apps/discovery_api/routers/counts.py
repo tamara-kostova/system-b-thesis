@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../.."))
 from shared.db import get_db
-from apps.discovery_api.suppression import suppress
+from shared.suppression import suppress
 
 router = APIRouter(prefix="/counts", tags=["counts"])
 

@@ -69,12 +69,24 @@ def create_projection(permit: PermitDB, db: Session, salt: str) -> tuple[str, st
 
     cids_sql = ", ".join(str(c) for c in concept_ids) if concept_ids else "0"
 
-    # Patients with any of the permitted concepts (via CONCEPT_ANCESTOR)
-    patient_subquery = f"""
-        SELECT DISTINCT person_id FROM cdm.condition_occurrence co
-        JOIN cdm.concept_ancestor ca ON ca.descendant_concept_id = co.condition_concept_id
-        WHERE ca.ancestor_concept_id IN ({cids_sql})
-    """
+    # Patients scoped to the permitted domains only (data minimisation — EHDS Chapter IV).
+    # Union across each permitted domain so a measurement-only permit never pulls patients
+    # from condition_occurrence.
+    _patient_parts = []
+    for _domain in domains:
+        if _domain not in DOMAIN_TABLE:
+            continue
+        _table = DOMAIN_TABLE[_domain]
+        _col = DOMAIN_CONCEPT_COL[_domain]
+        _patient_parts.append(
+            f"SELECT DISTINCT person_id FROM cdm.{_table} "
+            f"JOIN cdm.concept_ancestor ca ON ca.descendant_concept_id = {_col} "
+            f"WHERE ca.ancestor_concept_id IN ({cids_sql})"
+        )
+    if _patient_parts:
+        patient_subquery = " UNION ".join(_patient_parts)
+    else:
+        patient_subquery = "SELECT NULL::bigint AS person_id WHERE FALSE"
 
     if permit.format == "pseudonymized":
         person_col = f"md5(person_id::text || '{salt}') AS pseudo_id"
@@ -88,6 +100,9 @@ def create_projection(permit: PermitDB, db: Session, salt: str) -> tuple[str, st
     CREATE USER {user} WITH PASSWORD '{password}';
   END IF;
 END $$""",
+        # Always sync the password — handles re-provisioning where user exists
+        # but was created with a different random password in a prior attempt.
+        f"ALTER USER {user} WITH PASSWORD '{password}'",
     ]
 
     for domain in domains:

@@ -55,7 +55,7 @@ class AnthropicProvider(LLMProvider):
         kwargs: dict[str, Any] = {
             "model": self.model,
             "max_tokens": 4096,
-            "messages": messages,
+            "messages": _to_anthropic_messages(messages),
         }
         if system:
             kwargs["system"] = system
@@ -97,14 +97,15 @@ class _OpenAICompatibleProvider(LLMProvider):
         tools: list[dict] | None = None,
         system: str | None = None,
     ) -> LLMResponse:
+        import json as _json
+
         all_messages = []
         if system:
             all_messages.append({"role": "system", "content": system})
-        all_messages.extend(messages)
+        all_messages.extend(_to_openai_messages(messages))
 
         kwargs: dict[str, Any] = {"model": self.model, "messages": all_messages}
         if tools:
-            # Convert Anthropic-style tool defs to OpenAI format if needed
             kwargs["tools"] = [_to_openai_tool(t) for t in tools]
             kwargs["tool_choice"] = "auto"
 
@@ -113,12 +114,11 @@ class _OpenAICompatibleProvider(LLMProvider):
 
         tool_calls = []
         if choice.tool_calls:
-            import json
             for tc in choice.tool_calls:
                 tool_calls.append({
                     "id": tc.id,
                     "name": tc.function.name,
-                    "input": json.loads(tc.function.arguments),
+                    "input": _json.loads(tc.function.arguments),
                 })
 
         return LLMResponse(content=choice.content or "", tool_calls=tool_calls)
@@ -154,6 +154,56 @@ def get_provider() -> LLMProvider:
             return OllamaProvider()
         case _:
             raise ValueError(f"Unknown LLM_PROVIDER: {settings.llm_provider!r}")
+
+
+def _to_openai_messages(messages: list[dict]) -> list[dict]:
+    """Convert internal tool-call format to OpenAI wire format for conversation history."""
+    import json
+    result = []
+    for msg in messages:
+        if msg.get("role") == "assistant" and msg.get("tool_calls"):
+            openai_calls = [
+                {
+                    "id": tc["id"],
+                    "type": "function",
+                    "function": {
+                        "name": tc["name"],
+                        "arguments": json.dumps(tc["input"]),
+                    },
+                }
+                for tc in msg["tool_calls"]
+            ]
+            result.append({
+                "role": "assistant",
+                "content": msg.get("content") or None,
+                "tool_calls": openai_calls,
+            })
+        else:
+            result.append(msg)
+    return result
+
+
+def _to_anthropic_messages(messages: list[dict]) -> list[dict]:
+    """Convert internal tool-call format to Anthropic wire format for conversation history."""
+    result = []
+    for msg in messages:
+        if msg.get("role") == "assistant" and msg.get("tool_calls"):
+            content = []
+            if msg.get("content"):
+                content.append({"type": "text", "text": msg["content"]})
+            for tc in msg["tool_calls"]:
+                content.append({"type": "tool_use", "id": tc["id"], "name": tc["name"], "input": tc["input"]})
+            result.append({"role": "assistant", "content": content})
+        elif msg.get("role") == "tool":
+            # Merge consecutive tool results into a single user message (Anthropic requirement)
+            tool_result = {"type": "tool_result", "tool_use_id": msg["tool_call_id"], "content": msg["content"]}
+            if result and result[-1]["role"] == "user" and isinstance(result[-1]["content"], list):
+                result[-1]["content"].append(tool_result)
+            else:
+                result.append({"role": "user", "content": [tool_result]})
+        else:
+            result.append(msg)
+    return result
 
 
 def _to_openai_tool(tool: dict) -> dict:
