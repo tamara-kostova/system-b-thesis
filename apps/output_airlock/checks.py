@@ -11,12 +11,15 @@ import csv
 import io
 import json
 import re
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
+from shared.suppression import THRESHOLD
 
 CheckResult = tuple[str, bool, str]
 
 
 def check_csv_small_cells(content: bytes) -> CheckResult:
-    """Every numeric integer value in the CSV must be ≥ 10."""
+    """Every numeric integer value in the CSV must be ≥ 10 (THRESHOLD)."""
     try:
         text = content.decode("utf-8", errors="replace")
         reader = csv.reader(io.StringIO(text))
@@ -25,7 +28,7 @@ def check_csv_small_cells(content: bytes) -> CheckResult:
         return ("small_cell", False, f"Could not parse CSV: {e}")
 
     if len(rows) < 2:
-        return ("small_cell", True, "No data rows to check")
+        return ("small_cell", True, "CSV has no data rows — nothing to check")
 
     headers = rows[0]
     for row_idx, row in enumerate(rows[1:], 2):
@@ -33,7 +36,7 @@ def check_csv_small_cells(content: bytes) -> CheckResult:
             cell = cell.strip()
             try:
                 f = float(cell)
-                if f == int(f) and 0 < int(f) < 10:
+                if f == int(f) and 0 < int(f) < THRESHOLD:
                     col_name = headers[col_idx] if col_idx < len(headers) else f"col_{col_idx}"
                     return (
                         "small_cell",

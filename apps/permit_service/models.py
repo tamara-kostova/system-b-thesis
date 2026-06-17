@@ -32,6 +32,8 @@ class PermitDB(Base):
 
 
 def create_tables():
+    from shared.audit import create_audit_schema
+    create_audit_schema()
     with engine.begin() as conn:
         conn.execute(__import__("sqlalchemy").text("CREATE SCHEMA IF NOT EXISTS permits"))
     Base.metadata.create_all(engine)

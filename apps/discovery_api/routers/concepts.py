@@ -25,17 +25,41 @@ def search_concepts(
     limit: int = Query(20, le=100),
     db: Session = Depends(get_db),
 ):
-    sql = """
+    # Split into tokens and require each to appear anywhere in the concept name.
+    # This handles word-order differences between the query and OMOP concept names
+    # e.g. "type 2 diabetes" matches "Diabetes mellitus type 2 (disorder)".
+    tokens = [t for t in q.split() if len(t) >= 2]
+    if not tokens:
+        tokens = [q]
+
+    word_clauses = " AND ".join(f"concept_name ILIKE :w{i}" for i in range(len(tokens)))
+    word_params = {f"w{i}": f"%{t}%" for i, t in enumerate(tokens)}
+
+    sql = f"""
         SELECT concept_id, concept_name, vocabulary_id, domain_id, concept_class_id
         FROM cdm.concept
-        WHERE concept_name ILIKE :pattern
-          AND (:domain IS NULL OR domain_id = :domain)
+        WHERE ({word_clauses})
+          AND (:domain IS NULL OR LOWER(domain_id) = LOWER(:domain))
           AND standard_concept = 'S'
         ORDER BY concept_name
         LIMIT :limit
     """
-    rows = db.execute(text(sql), {"pattern": f"%{q}%", "domain": domain, "limit": limit})
+    rows = db.execute(text(sql), {"domain": domain, "limit": limit, **word_params})
     return [ConceptResult(**r._mapping) for r in rows]
+
+
+@router.get("/{concept_id}", response_model=ConceptResult)
+def get_concept(concept_id: int, db: Session = Depends(get_db)):
+    sql = """
+        SELECT concept_id, concept_name, vocabulary_id, domain_id, concept_class_id
+        FROM cdm.concept
+        WHERE concept_id = :concept_id
+    """
+    row = db.execute(text(sql), {"concept_id": concept_id}).fetchone()
+    if row is None:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=f"Concept {concept_id} not found")
+    return ConceptResult(**row._mapping)
 
 
 @router.get("/{concept_id}/descendants", response_model=list[ConceptResult])

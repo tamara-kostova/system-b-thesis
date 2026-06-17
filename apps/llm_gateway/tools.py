@@ -126,8 +126,15 @@ def _require_int_concept_id(input: dict) -> int | None:
 def execute_tool(name: str, input: dict) -> str:
     match name:
         case "search_concept":
-            r = _client.get("/concepts/search", params=input)
+            params = {"q": input["query"]}
+            if "domain" in input:
+                params["domain"] = input["domain"]
+            r = _client.get("/concepts/search", params=params)
             r.raise_for_status()
+            # If domain-filtered search is empty, retry without the domain filter
+            if params.get("domain") and r.json() == []:
+                r = _client.get("/concepts/search", params={"q": input["query"]})
+                r.raise_for_status()
             return r.text
         case "get_concept_descendants":
             cid = _require_int_concept_id(input)
@@ -150,6 +157,21 @@ def execute_tool(name: str, input: dict) -> str:
                 return json.dumps({"error": f"Unknown table '{table}'", "available": available})
             return json.dumps({"table": table, "columns": _OMOP_SCHEMA[table]})
         case "draft_application":
+            invalid = []
+            for cid in input.get("concept_ids", []):
+                try:
+                    check = _client.get(f"/concepts/{int(cid)}")
+                    if check.status_code == 404:
+                        invalid.append(cid)
+                except Exception:
+                    invalid.append(cid)
+            if invalid:
+                return json.dumps({
+                    "error": (
+                        f"Concept IDs {invalid} were not found in the OMOP vocabulary. "
+                        "Call search_concept first to obtain valid concept IDs, then retry draft_application."
+                    )
+                })
             return _draft_application(**input)
         case _:
             return f"Unknown tool: {name}"

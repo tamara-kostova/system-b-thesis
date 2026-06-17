@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../.."))
 from shared.db import get_db
+from shared.audit import log_event
 from apps.permit_service.models import PermitDB
 from apps.permit_service.state_machine import PermitStateMachine, IllegalTransitionError
 
@@ -92,6 +93,14 @@ def create_permit(body: PermitCreate, db: Session = Depends(get_db)):
         pseudonymization_justification=body.pseudonymization_justification,
     )
     db.add(permit)
+    db.flush()
+    log_event(
+        event_type="permit.draft",
+        actor=body.holder,
+        resource_id=permit.permit_id,
+        details={"type": body.type, "purpose": body.purpose},
+        db=db,
+    )
     db.commit()
     db.refresh(permit)
     return PermitOut.from_db(permit)
