@@ -11,7 +11,7 @@ from pathlib import Path
 
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
 REVIEWER_PASSWORD = os.getenv("REVIEWER_PASSWORD")
-PERMIT_SERVICE_URL = os.getenv("PERMIT_SERVICE_URL", "http://localhost:8004")
+PERMIT_SERVICE_URL = os.getenv("PERMIT_SERVICE_URL", "http://localhost:8002")
 
 st.set_page_config(page_title="Reviewer Console", layout="wide")
 

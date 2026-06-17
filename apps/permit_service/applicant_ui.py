@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
-PERMIT_SERVICE_URL = os.getenv("PERMIT_SERVICE_URL", "http://localhost:8004")
+PERMIT_SERVICE_URL = os.getenv("PERMIT_SERVICE_URL", "http://localhost:8002")
 
 st.set_page_config(page_title="Apply for Data Access", layout="wide")
 
