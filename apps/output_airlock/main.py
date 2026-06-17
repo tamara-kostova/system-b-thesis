@@ -8,12 +8,8 @@ EHDS Articles 50 (output checking) and 73 (audit).
 """
 
 import os
-import sys
 from datetime import datetime, timezone
 from typing import Any
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
-
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form
 from fastapi.responses import Response

@@ -20,8 +20,6 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from shared.audit import log_event
 
 client = docker.from_env()

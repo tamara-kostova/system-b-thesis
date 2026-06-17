@@ -4,8 +4,6 @@ from sqlalchemy import Column, String, Text, Date, DateTime, JSON
 from sqlalchemy import event
 from sqlalchemy.orm import Session
 
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 from shared.db import Base, engine
 
 

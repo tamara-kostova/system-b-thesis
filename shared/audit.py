@@ -19,8 +19,6 @@ from typing import Any
 from sqlalchemy import Column, Integer, String, DateTime, JSON
 from sqlalchemy.orm import Session
 
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from shared.db import Base, engine
 
 logger = logging.getLogger("audit")

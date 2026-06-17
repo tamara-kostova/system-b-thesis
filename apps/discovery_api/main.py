@@ -1,6 +1,3 @@
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
-
 from fastapi import FastAPI
 from apps.discovery_api.routers import datasets, concepts, counts
 

@@ -1,8 +1,6 @@
 """Reviewer UI — approve or refuse pending applications."""
 
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
-
+import os
 import requests
 import streamlit as st
 from datetime import date, timedelta

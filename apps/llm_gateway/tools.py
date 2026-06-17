@@ -123,7 +123,21 @@ def _require_int_concept_id(input: dict) -> int | None:
         return None
 
 
-def execute_tool(name: str, input: dict) -> str:
+def _extract_concept_ids(result_json: str) -> set[int]:
+    """Parse concept IDs from a search_concept or get_concept_descendants result."""
+    try:
+        data = json.loads(result_json)
+        ids: set[int] = set()
+        items = data if isinstance(data, list) else [data]
+        for item in items:
+            if isinstance(item, dict) and "concept_id" in item:
+                ids.add(int(item["concept_id"]))
+        return ids
+    except (json.JSONDecodeError, ValueError, TypeError):
+        return set()
+
+
+def execute_tool(name: str, input: dict, allowed_concept_ids: set[int] | None = None) -> str:
     match name:
         case "search_concept":
             params = {"q": input["query"]}
@@ -146,7 +160,14 @@ def execute_tool(name: str, input: dict) -> str:
         case "estimate_count":
             cid = _require_int_concept_id(input)
             if cid is None:
-                return json.dumps({"error": "concept_id must be an integer. Call search_concept first to find the correct concept_id."})
+                return json.dumps({"error": "concept_id must be a plain integer"})
+            if allowed_concept_ids is not None and cid not in allowed_concept_ids:
+                return json.dumps({
+                    "error": (
+                        f"Concept ID {cid} was not returned by search_concept in this session. "
+                        "Call search_concept first to obtain a valid concept ID, then retry."
+                    )
+                })
             r = _client.get(f"/counts/{cid}")
             r.raise_for_status()
             return r.text
@@ -157,21 +178,15 @@ def execute_tool(name: str, input: dict) -> str:
                 return json.dumps({"error": f"Unknown table '{table}'", "available": available})
             return json.dumps({"table": table, "columns": _OMOP_SCHEMA[table]})
         case "draft_application":
-            invalid = []
-            for cid in input.get("concept_ids", []):
-                try:
-                    check = _client.get(f"/concepts/{int(cid)}")
-                    if check.status_code == 404:
-                        invalid.append(cid)
-                except Exception:
-                    invalid.append(cid)
-            if invalid:
-                return json.dumps({
-                    "error": (
-                        f"Concept IDs {invalid} were not found in the OMOP vocabulary. "
-                        "Call search_concept first to obtain valid concept IDs, then retry draft_application."
-                    )
-                })
+            if allowed_concept_ids is not None:
+                not_seen = [c for c in input.get("concept_ids", []) if int(c) not in allowed_concept_ids]
+                if not_seen:
+                    return json.dumps({
+                        "error": (
+                            f"Concept IDs {not_seen} have not been returned by search_concept "
+                            "in this session. Call search_concept first to obtain valid IDs."
+                        )
+                    })
             return _draft_application(**input)
         case _:
             return f"Unknown tool: {name}"

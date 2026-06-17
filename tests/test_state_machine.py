@@ -132,10 +132,14 @@ def test_illegal_transition_does_not_write_audit():
         mock_log.assert_not_called()
 
 
-def test_grant_valid_until_before_valid_from_is_accepted_by_state_machine():
-    """State machine does not validate date ordering — documents the gap."""
+def test_grant_valid_until_before_valid_from_is_rejected():
+    """Issuing an already-expired permit (valid_until ≤ valid_from) must be refused."""
     with patch("apps.permit_service.state_machine.log_event"):
-        sm = make_sm("under_review")
-        sm.grant("reviewer", date(2026, 12, 31), date(2026, 1, 1))
-        assert sm.permit.valid_from == date(2026, 12, 31)
-        assert sm.permit.valid_until == date(2026, 1, 1)
+        with pytest.raises(IllegalTransitionError):
+            make_sm("under_review").grant("reviewer", date(2026, 12, 31), date(2026, 1, 1))
+
+
+def test_grant_same_day_valid_from_and_until_is_rejected():
+    with patch("apps.permit_service.state_machine.log_event"):
+        with pytest.raises(IllegalTransitionError):
+            make_sm("under_review").grant("reviewer", date(2026, 6, 1), date(2026, 6, 1))

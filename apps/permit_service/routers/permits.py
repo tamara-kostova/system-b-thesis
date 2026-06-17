@@ -1,12 +1,10 @@
 from datetime import date
 from typing import Literal
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../.."))
-from shared.db import get_db
+from shared.db import get_db, _settings as _db_settings
 from shared.audit import log_event
 from apps.permit_service.models import PermitDB
 from apps.permit_service.state_machine import PermitStateMachine, IllegalTransitionError
@@ -80,6 +78,12 @@ class TransitionRequest(BaseModel):
     valid_until: date | None = None
 
 
+def _require_internal_key(x_internal_key: str | None = Header(default=None)):
+    key = _db_settings.internal_api_key
+    if key and x_internal_key != key:
+        raise HTTPException(401, "X-Internal-Key header required for this endpoint")
+
+
 # --- Endpoints ---
 
 @router.post("", response_model=PermitOut, status_code=201)
@@ -108,7 +112,12 @@ def create_permit(body: PermitCreate, db: Session = Depends(get_db)):
 
 
 @router.get("", response_model=list[PermitOut])
-def list_permits(state: str | None = None, holder: str | None = None, db: Session = Depends(get_db)):
+def list_permits(
+    state: str | None = None,
+    holder: str | None = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(_require_internal_key),
+):
     q = db.query(PermitDB)
     if state:
         q = q.filter(PermitDB.state == state)

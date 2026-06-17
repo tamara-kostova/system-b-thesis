@@ -18,8 +18,6 @@ import string
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 from apps.permit_service.models import PermitDB
 
 

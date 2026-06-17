@@ -1,8 +1,6 @@
 """Applicant UI — submit and track data access applications."""
 
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
-
+import os
 import requests
 import streamlit as st
 from dotenv import load_dotenv

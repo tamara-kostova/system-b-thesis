@@ -5,6 +5,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
+export PYTHONPATH="$ROOT"
 VENV="$ROOT/.venv/bin"
 LOG="$ROOT/logs"
 mkdir -p "$LOG"
@@ -74,7 +75,15 @@ start_service llm_ui \
 
 # ── summary ───────────────────────────────────────────────────────────────────
 
-sleep 1   # let processes settle before printing
+echo "Waiting for APIs to be ready..."
+for port in 8003 8002 8004 8005 8006; do
+    for i in $(seq 1 20); do
+        if curl -sf "http://localhost:$port/health" > /dev/null 2>&1; then
+            break
+        fi
+        sleep 0.5
+    done
+done
 
 echo "System B is running"
 echo ""

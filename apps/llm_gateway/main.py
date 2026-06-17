@@ -7,10 +7,7 @@ Mode B (In-SPE):    called from inside a JupyterLab SPE, generates
 """
 
 import re
-import sys
 import os
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -18,7 +15,7 @@ from pydantic import BaseModel
 from shared.audit import log_event
 from .config import settings
 from .providers import get_provider, LLMResponse
-from .tools import TOOL_DEFINITIONS, execute_tool
+from .tools import TOOL_DEFINITIONS, execute_tool, _extract_concept_ids
 
 app = FastAPI(title="LLM Gateway", version="0.1.0")
 
@@ -109,6 +106,7 @@ def _run_tool_loop(
 
     provider = get_provider()
     max_rounds = 5
+    allowed_concept_ids: set[int] = set()
 
     for _ in range(max_rounds):
         try:
@@ -118,8 +116,6 @@ def _run_tool_loop(
                 system=system,
             )
         except BadRequestError:
-            # Model produced malformed tool call arguments; strip the bad turn
-            # and ask again without tools so we at least return something useful.
             clean = [m for m in messages if m.get("role") in ("user", "system")]
             fallback: LLMResponse = provider.chat(messages=clean, system=system)
             return fallback.content or "I was unable to complete the tool call. Please rephrase your question."
@@ -139,7 +135,9 @@ def _run_tool_loop(
         for tc in response.tool_calls:
             log_event("llm.tool_call", actor=user_id, resource_id=tc["name"],
                       details={"input": tc["input"]})
-            result = execute_tool(tc["name"], tc["input"])
+            result = execute_tool(tc["name"], tc["input"], allowed_concept_ids=allowed_concept_ids)
+            if tc["name"] in ("search_concept", "get_concept_descendants"):
+                allowed_concept_ids.update(_extract_concept_ids(result))
             messages.append({
                 "role": "tool",
                 "tool_call_id": tc["id"],

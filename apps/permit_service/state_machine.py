@@ -12,8 +12,6 @@ No state change happens outside this class.
 from datetime import date, datetime, timezone
 from sqlalchemy.orm import Session
 
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 from shared.audit import log_event
 from shared.models import PERMIT_TRANSITIONS as TRANSITIONS
 from apps.permit_service.models import PermitDB
@@ -53,6 +51,10 @@ class PermitStateMachine:
         self._transition("under_review", actor)
 
     def grant(self, actor: str, valid_from: date, valid_until: date):
+        if valid_until <= valid_from:
+            raise IllegalTransitionError(
+                f"valid_until ({valid_until}) must be after valid_from ({valid_from})"
+            )
         self.permit.valid_from = valid_from
         self.permit.valid_until = valid_until
         self._transition("granted", actor, {"valid_from": str(valid_from), "valid_until": str(valid_until)})

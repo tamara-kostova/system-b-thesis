@@ -3,8 +3,6 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../.."))
 from shared.db import get_db
 
 router = APIRouter(prefix="/concepts", tags=["concepts"])

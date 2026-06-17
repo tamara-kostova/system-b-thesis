@@ -4,8 +4,6 @@ from datetime import datetime, timezone
 from sqlalchemy import Column, String, Boolean, LargeBinary, DateTime, Text, JSON
 from sqlalchemy.dialects.postgresql import UUID
 
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 from shared.db import Base, engine
 
 

@@ -12,7 +12,7 @@ from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 
 from apps.llm_gateway.main import app, _contains_pii
-from apps.llm_gateway.tools import execute_tool, TOOL_DEFINITIONS
+from apps.llm_gateway.tools import execute_tool, TOOL_DEFINITIONS, _extract_concept_ids
 
 client = TestClient(app)
 
@@ -163,3 +163,44 @@ def test_spe_clean_question_passes_guardrail():
         })
     assert resp.status_code == 200
     assert "provider" in resp.json()
+
+
+# ── Concept ID session allowlist ───────────────────────────────────────────────
+
+def test_estimate_count_without_prior_search_is_blocked():
+    """estimate_count with an arbitrary concept ID is blocked when allowlist is non-empty."""
+    arbitrary_concept_id = 999999
+    allowed: set[int] = {201826}  # some other ID was searched
+    result = execute_tool("estimate_count", {"concept_id": arbitrary_concept_id},
+                          allowed_concept_ids=allowed)
+    parsed = json.loads(result)
+    assert "error" in parsed or "not in" in json.dumps(parsed).lower(), (
+        "Expected error when concept ID is not in session allowlist"
+    )
+
+
+def test_estimate_count_with_allowlisted_id_is_permitted():
+    """estimate_count succeeds when the concept ID is in the session allowlist."""
+    with patch("apps.llm_gateway.tools._client") as mock_client:
+        mock_client.get.return_value.text = '{"count": "42"}'
+        mock_client.get.return_value.raise_for_status = MagicMock()
+        allowed: set[int] = {201826}
+        result = execute_tool("estimate_count", {"concept_id": 201826},
+                              allowed_concept_ids=allowed)
+    assert "42" in result or "count" in result.lower()
+
+
+def test_extract_concept_ids_from_search_result():
+    """_extract_concept_ids pulls concept_id integers from a search result JSON."""
+    payload = json.dumps([
+        {"concept_id": 201826, "concept_name": "Type 2 diabetes"},
+        {"concept_id": 4193704, "concept_name": "Diabetes mellitus"},
+    ])
+    ids = _extract_concept_ids(payload)
+    assert ids == {201826, 4193704}
+
+
+def test_extract_concept_ids_handles_bad_json():
+    """_extract_concept_ids returns an empty set on malformed JSON."""
+    ids = _extract_concept_ids("not json at all {{{")
+    assert ids == set()

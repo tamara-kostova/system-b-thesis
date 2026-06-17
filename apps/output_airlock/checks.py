@@ -11,8 +11,6 @@ import csv
 import io
 import json
 import re
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 from shared.suppression import THRESHOLD
 
 CheckResult = tuple[str, bool, str]

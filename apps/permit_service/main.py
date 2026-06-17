@@ -1,6 +1,3 @@
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
-
 from fastapi import FastAPI
 from apps.permit_service.models import create_tables
 from apps.permit_service.routers import permits
