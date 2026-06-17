@@ -84,6 +84,24 @@ def _require_internal_key(x_internal_key: str | None = Header(default=None)):
         raise HTTPException(401, "X-Internal-Key header required for this endpoint")
 
 
+def _expire_due(db: Session) -> int:
+    """Expire all granted permits whose valid_until is in the past. Returns count expired."""
+    from datetime import date as _date
+    due = (
+        db.query(PermitDB)
+        .filter(PermitDB.state == "granted", PermitDB.valid_until < _date.today())
+        .all()
+    )
+    count = 0
+    for p in due:
+        try:
+            PermitStateMachine(p, db).expire("system")
+            count += 1
+        except Exception:
+            pass
+    return count
+
+
 # --- Endpoints ---
 
 @router.post("", response_model=PermitOut, status_code=201)
@@ -93,7 +111,7 @@ def create_permit(body: PermitCreate, db: Session = Depends(get_db)):
         holder=body.holder,
         named_users=body.named_users,
         purpose=body.purpose,
-        data_scope=body.data_scope.model_dump(),
+        data_scope=body.data_scope.model_dump(mode="json"),
         format=body.format,
         pseudonymization_justification=body.pseudonymization_justification,
     )
@@ -131,6 +149,12 @@ def public_register(db: Session = Depends(get_db)):
     """Public list of granted permits — no personal data, metadata only."""
     permits = db.query(PermitDB).filter(PermitDB.state == "granted").all()
     return [PermitOut.from_db(p) for p in permits]
+
+
+@router.post("/expire-due", response_model=dict)
+def expire_due(db: Session = Depends(get_db)):
+    """Expire all granted permits whose valid_until has passed (EHDS Article 68)."""
+    return {"expired": _expire_due(db)}
 
 
 @router.get("/{permit_id}", response_model=PermitOut)

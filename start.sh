@@ -14,9 +14,18 @@ mkdir -p "$LOG"
 
 start_service() {
     local name="$1"; shift
+    local pidfile="$LOG/$name.pid"
+    # Kill any previous instance so re-running start.sh doesn't hit "port in use"
+    if [ -f "$pidfile" ]; then
+        local old_pid
+        old_pid=$(cat "$pidfile")
+        kill "$old_pid" 2>/dev/null || true
+        rm -f "$pidfile"
+        sleep 0.3
+    fi
     local logfile="$LOG/$name.log"
     "$@" > "$logfile" 2>&1 &
-    echo $! > "$LOG/$name.pid"
+    echo $! > "$pidfile"
 }
 
 check_postgres() {

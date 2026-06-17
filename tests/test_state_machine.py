@@ -143,3 +143,37 @@ def test_grant_same_day_valid_from_and_until_is_rejected():
     with patch("apps.permit_service.state_machine.log_event"):
         with pytest.raises(IllegalTransitionError):
             make_sm("under_review").grant("reviewer", date(2026, 6, 1), date(2026, 6, 1))
+
+
+# Expiry automation
+
+def test_expire_due_expires_past_permits():
+    """_expire_due should expire granted permits with valid_until in the past."""
+    from unittest.mock import patch, MagicMock
+    from apps.permit_service.routers.permits import _expire_due
+    from apps.permit_service.models import PermitDB
+
+    past_permit = PermitDB()
+    past_permit.permit_id = "past-permit"
+    past_permit.state = "granted"
+    past_permit.valid_until = date(2020, 1, 1)
+
+    db = MagicMock()
+    db.query.return_value.filter.return_value.all.return_value = [past_permit]
+
+    with patch("apps.permit_service.routers.permits.PermitStateMachine") as mock_sm:
+        mock_instance = mock_sm.return_value
+        n = _expire_due(db)
+    assert n == 1
+    mock_instance.expire.assert_called_once_with("system")
+
+
+def test_expire_due_skips_when_none_due():
+    """_expire_due returns 0 when no permits are past their valid_until."""
+    from apps.permit_service.routers.permits import _expire_due
+    from unittest.mock import MagicMock
+
+    db = MagicMock()
+    db.query.return_value.filter.return_value.all.return_value = []
+
+    assert _expire_due(db) == 0

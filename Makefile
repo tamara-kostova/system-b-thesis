@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-.PHONY: start stop restart status logs db test
+.PHONY: start stop restart status logs db test expire
 
 start:
 	@bash start.sh
@@ -33,3 +33,6 @@ logs:
 
 test:
 	.venv/bin/python -m pytest tests/ -v
+
+expire:
+	curl -sf -X POST http://localhost:8002/permits/expire-due | python3 -m json.tool

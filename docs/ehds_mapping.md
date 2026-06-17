@@ -29,6 +29,8 @@ Maps each implemented EHDS article to the exact file and line in System B.
 | **Art. 68** | SPE isolation — no internet egress | `apps/spe_provisioner/provisioner.py` | 58 | Internal Docker network (`--internal`) |
 | **Art. 68** | SPE teardown on permit expiry | `apps/spe_provisioner/provisioner.py` | 116 | `teardown()` — stops container, removes network |
 | **Art. 68** | SPE teardown on permit expiry | `apps/spe_provisioner/projection.py` | 143 | `teardown_projection()` — drops schema and DB user |
+| **Art. 68** | Automatic permit expiry on valid_until | `apps/permit_service/main.py` | lifespan | Background task runs hourly via `_expiry_loop()`, calls `_expire_due()` |
+| **Art. 68** | Manual expiry trigger | `apps/permit_service/routers/permits.py` | POST /permits/expire-due | Returns `{"expired": n}` — also callable via `make expire` |
 | **Art. 73** | Audit log — queryable DB record | `shared/audit.py` | 29 | `AuditEvent` SQLAlchemy model — every event written to `audit.event` table |
 | **Art. 73** | Audit log — every state transition | `apps/permit_service/state_machine.py` | 31 | `_transition()` calls `log_event()` on every change; audit row commits atomically with state change |
 | **Art. 73** | Audit log — container lifecycle | `apps/spe_provisioner/provisioner.py` | 99 | `log_event("spe.started", ...)` |
