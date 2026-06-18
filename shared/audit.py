@@ -22,6 +22,12 @@ from sqlalchemy.orm import Session
 from shared.db import Base, engine
 
 logger = logging.getLogger("audit")
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setLevel(logging.INFO)
+    logger.addHandler(_handler)
+    logger.propagate = False
 
 
 class AuditEvent(Base):

@@ -65,22 +65,28 @@ def create_projection(permit: PermitDB, db: Session, salt: str) -> tuple[str, st
     time_until  = scope.get("time_window_until")
     domains     = scope.get("domains", [])
 
-    cids_sql = ", ".join(str(c) for c in concept_ids) if concept_ids else "0"
+    cids_sql = ", ".join(str(c) for c in concept_ids) if concept_ids else None
 
     # Patients scoped to the permitted domains only (data minimisation — EHDS Chapter IV).
     # Union across each permitted domain so a measurement-only permit never pulls patients
     # from condition_occurrence.
+    # When concept_ids is empty, no cohort restriction — all patients in the domain are included.
     _patient_parts = []
     for _domain in domains:
         if _domain not in DOMAIN_TABLE:
             continue
         _table = DOMAIN_TABLE[_domain]
         _col = DOMAIN_CONCEPT_COL[_domain]
-        _patient_parts.append(
-            f"SELECT DISTINCT person_id FROM cdm.{_table} "
-            f"JOIN cdm.concept_ancestor ca ON ca.descendant_concept_id = {_col} "
-            f"WHERE ca.ancestor_concept_id IN ({cids_sql})"
-        )
+        if cids_sql:
+            _patient_parts.append(
+                f"SELECT DISTINCT person_id FROM cdm.{_table} "
+                f"WHERE {_col} IN ("
+                f"SELECT descendant_concept_id FROM cdm.concept_ancestor "
+                f"WHERE ancestor_concept_id IN ({cids_sql}) "
+                f"UNION SELECT unnest(ARRAY[{cids_sql}]))"
+            )
+        else:
+            _patient_parts.append(f"SELECT DISTINCT person_id FROM cdm.{_table}")
     if _patient_parts:
         patient_subquery = " UNION ".join(_patient_parts)
     else:
@@ -112,6 +118,14 @@ END $$""",
         date_col    = DOMAIN_DATE_COL[domain]
         view        = domain.lower() + "s"
 
+        concept_filter = (
+            f"AND {concept_col} IN (\n"
+            f"        SELECT descendant_concept_id FROM cdm.concept_ancestor\n"
+            f"        WHERE ancestor_concept_id IN ({cids_sql})\n"
+            f"        UNION SELECT unnest(ARRAY[{cids_sql}])\n"
+            f"    )"
+            if cids_sql else ""
+        )
         stmts.append(f"""CREATE OR REPLACE VIEW {schema}.{view} AS
   SELECT
     {person_col},
@@ -120,10 +134,7 @@ END $$""",
   FROM cdm.{table}
   WHERE person_id IN ({patient_subquery})
     AND {date_col} BETWEEN '{time_from}' AND '{time_until}'
-    AND {concept_col} IN (
-        SELECT descendant_concept_id FROM cdm.concept_ancestor
-        WHERE ancestor_concept_id IN ({cids_sql})
-    )""")
+    {concept_filter}""")
 
     stmts += [
         f"GRANT USAGE ON SCHEMA {schema} TO {user}",

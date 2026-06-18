@@ -62,7 +62,7 @@ start_service output_airlock \
     "$VENV/uvicorn" apps.output_airlock.main:app --port 8005 --log-level warning
 
 start_service llm_gateway \
-    "$VENV/uvicorn" apps.llm_gateway.main:app --port 8006 --log-level warning
+    "$VENV/uvicorn" apps.llm_gateway.main:app --host 0.0.0.0 --port 8006 --log-level warning
 
 # ── Streamlit UIs ─────────────────────────────────────────────────────────────
 

@@ -44,10 +44,24 @@ _MODE_B_SYSTEM = """You are a coding assistant running inside a Secure Processin
 The researcher has a granted data access permit. You help write Python and SQL
 analysis code scoped to the permit's database views.
 
-Available views will be listed in the user's message. Only reference those views.
+The kernel already has these globals pre-loaded — do NOT redefine or import them:
+  - engine         : SQLAlchemy engine connected to the permit's schema
+  - pd             : pandas (already imported as pd)
+  - available_views: list of view names the permit covers
+
+Always load data using the pre-loaded engine, like this:
+  from sqlalchemy import text
+  with engine.connect() as conn:
+      df = pd.read_sql(text("SELECT ..."), conn)
+
+The user's message lists the EXACT view names and their columns.
+These are authoritative — use them verbatim. Do NOT substitute with standard OMOP CDM
+table or column names (e.g. do not replace "conditions" with "condition_occurrence",
+do not replace "pseudo_id" with "person_id").
+
 Never generate code that selects all rows without aggregation (no bare SELECT * without GROUP BY or LIMIT).
 Never generate code that exports data outside the environment.
-Prefer pandas aggregations. Always explain what the code does.
+Always produce complete, runnable code — no placeholder comments like "# load your data here".
 """
 
 # ── PII guardrail ──────────────────────────────────────────────────────────────
@@ -86,6 +100,7 @@ class SPEChatRequest(BaseModel):
     question: str
     permit_id: str
     available_views: list[str]
+    view_schemas: dict[str, list[str]] = {}
     user_id: str = "anonymous"
 
 
@@ -101,6 +116,7 @@ def _run_tool_loop(
     system: str,
     user_id: str,
     context: str = "discovery",
+    tools: list[dict] | None = None,
 ) -> str:
     from openai import BadRequestError
 
@@ -112,7 +128,7 @@ def _run_tool_loop(
         try:
             response: LLMResponse = provider.chat(
                 messages=messages,
-                tools=TOOL_DEFINITIONS,
+                tools=tools,
                 system=system,
             )
         except BadRequestError:
@@ -162,6 +178,7 @@ def chat(req: ChatRequest):
         messages=list(req.messages),
         system=_MODE_A_SYSTEM,
         user_id=req.user_id,
+        tools=TOOL_DEFINITIONS,
     )
     return ChatResponse(reply=reply, provider=settings.llm_provider)
 
@@ -176,13 +193,19 @@ def chat_spe(req: SPEChatRequest):
         raise HTTPException(400, "Message contains what appears to be a patient identifier. Refused.")
 
     views_list = ", ".join(req.available_views) if req.available_views else "none"
+    schema_lines = "\n".join(
+        f"  {view}: {', '.join(cols)}"
+        for view, cols in req.view_schemas.items()
+    )
+    context_block = (
+        f"Permit: {req.permit_id}\n"
+        f"Available views: {views_list}\n"
+    )
+    if schema_lines:
+        context_block += f"View columns:\n{schema_lines}\n"
     messages = [{
         "role": "user",
-        "content": (
-            f"Permit: {req.permit_id}\n"
-            f"Available views: {views_list}\n\n"
-            f"{req.question}"
-        ),
+        "content": context_block + f"\n{req.question}",
     }]
 
     reply = _run_tool_loop(
@@ -190,6 +213,7 @@ def chat_spe(req: SPEChatRequest):
         system=_MODE_B_SYSTEM,
         user_id=req.user_id,
         context=req.permit_id,
+        tools=None,
     )
     return ChatResponse(reply=reply, provider=settings.llm_provider)
 

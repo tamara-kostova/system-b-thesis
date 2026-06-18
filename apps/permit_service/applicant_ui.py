@@ -1,6 +1,7 @@
 """Applicant UI — submit and track data access applications."""
 
 import os
+from datetime import date
 import requests
 import streamlit as st
 from dotenv import load_dotenv
@@ -57,8 +58,8 @@ with tab_apply:
                                  default=["Condition"])
         concept_ids_raw = st.text_input("Concept IDs (comma-separated integers)",
                                         placeholder="201826, 316866")
-        time_from = st.date_input("Time window from")
-        time_until = st.date_input("Time window until")
+        time_from = st.date_input("Time window from", value=date(2000, 1, 1))
+        time_until = st.date_input("Time window until", value=date(2026, 6, 5))
         fmt = st.radio("Data format", ["anonymized", "pseudonymized"])
         pseudo_justification = None
         if fmt == "pseudonymized":

@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-.PHONY: start stop restart status logs db test expire
+.PHONY: start stop restart status logs db test expire build-spe
 
 start:
 	@bash start.sh
@@ -36,3 +36,6 @@ test:
 
 expire:
 	curl -sf -X POST http://localhost:8002/permits/expire-due | python3 -m json.tool
+
+build-spe:
+	docker build -t system-b-spe:latest -f Dockerfile.spe .

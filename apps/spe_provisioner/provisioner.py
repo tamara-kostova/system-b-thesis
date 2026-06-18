@@ -80,10 +80,13 @@ def provision(permit_id: str, db_user: str, db_password: str) -> dict:
         detach=True,
         network="bridge",           # default bridge for host port publishing only
         environment={
-            "DATABASE_URL": db_url,
-            "PERMIT_ID":    permit_id,
-            "JUPYTER_TOKEN": token,
+            "DATABASE_URL":    db_url,
+            "PERMIT_ID":       permit_id,
+            "JUPYTER_TOKEN":   token,
+            "LLM_GATEWAY_URL": os.getenv("LLM_GATEWAY_URL", "http://host.docker.internal:8006"),
         },
+        # host.docker.internal doesn't auto-resolve on Linux Docker — add it explicitly
+        extra_hosts={"host.docker.internal": "host-gateway"},
         ports={"8888/tcp": None},   # OS picks a free host port
         labels={"permit_id": permit_id, "role": "spe"},
     )
