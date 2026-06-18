@@ -93,10 +93,7 @@ def create_projection(permit: PermitDB, db: Session, salt: str) -> tuple[str, st
         patient_subquery = "SELECT NULL::bigint AS person_id WHERE FALSE"
 
     safe_salt = salt.replace("'", "''")
-    if permit.format == "pseudonymized":
-        person_col = f"md5(person_id::text || '{safe_salt}') AS pseudo_id"
-    else:
-        person_col = "NULL::text AS pseudo_id"
+    person_col = f"md5(person_id::text || '{safe_salt}') AS pseudo_id"
 
     stmts = [
         f"CREATE SCHEMA IF NOT EXISTS {schema}",

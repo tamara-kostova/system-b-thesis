@@ -14,6 +14,10 @@ const nextConfig = {
         source: "/api/llm/:path*",
         destination: "http://localhost:8006/:path*",
       },
+      {
+        source: "/api/spe/:path*",
+        destination: "http://localhost:8004/:path*",
+      },
     ];
   },
 };

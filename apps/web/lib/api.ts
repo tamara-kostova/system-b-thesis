@@ -87,6 +87,14 @@ export const api = {
     get: (conceptId: number) =>
       get<CountResult>(`/api/discovery/counts?concept_id=${conceptId}`),
   },
+  spe: {
+    launch: (permitId: string) =>
+      post<{permit_id: string; jupyter_url: string; status: string}>("/api/spe/spe", { permit_id: permitId }),
+    status: (permitId: string) =>
+      get<{permit_id: string; jupyter_url: string; status: string}>(`/api/spe/spe/${permitId}`),
+    teardown: (permitId: string) =>
+      fetch(`/api/spe/spe/${permitId}`, { method: "DELETE" }),
+  },
   llm: {
     chat: (messages: {role: string; content: string}[], userId = "anonymous") =>
       post<{reply: string; provider: string}>("/api/llm/chat", { messages, user_id: userId }),
@@ -105,6 +113,14 @@ export const api = {
       post<Permit>(`/api/permits/permits/${permitId}/submit`, { actor }),
     listByHolder: (holder: string) =>
       get<Permit[]>(`/api/permits/permits?holder=${encodeURIComponent(holder)}`),
+    listByState: (state: string) =>
+      get<Permit[]>(`/api/permits/permits?state=${encodeURIComponent(state)}`),
     register: () => get<Permit[]>("/api/permits/permits/register"),
+    startReview: (permitId: string, actor: string) =>
+      post<Permit>(`/api/permits/permits/${permitId}/review`, { actor }),
+    grant: (permitId: string, actor: string, validFrom: string, validUntil: string) =>
+      post<Permit>(`/api/permits/permits/${permitId}/grant`, { actor, valid_from: validFrom, valid_until: validUntil }),
+    refuse: (permitId: string, actor: string, comment: string) =>
+      post<Permit>(`/api/permits/permits/${permitId}/refuse`, { actor, comment }),
   },
 };

@@ -21,13 +21,15 @@ interface FormState {
   username: string;
 }
 
+const today = new Date().toISOString().slice(0, 10);
+
 const initialForm: FormState = {
   accessType: "request",
   purpose: "research",
   domains: ["Condition"],
   conceptIds: "",
-  timeFrom: "2000-01-01",
-  timeUntil: "2026-01-01",
+  timeFrom: today,
+  timeUntil: today,
   format: "anonymized",
   pseudoJustification: "",
   namedUsers: "",

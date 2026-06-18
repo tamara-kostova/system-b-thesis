@@ -9,6 +9,8 @@ const links = [
   { href: "/concepts", label: "Concepts" },
   { href: "/apply", label: "Apply" },
   { href: "/my-applications", label: "My Applications" },
+  { href: "/spe", label: "My SPEs" },
+  { href: "/review", label: "Review" },
   { href: "/register", label: "Register" },
 ];
 

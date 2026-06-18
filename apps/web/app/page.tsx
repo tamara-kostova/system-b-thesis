@@ -25,7 +25,7 @@ const cards = [
 
 export default function Home() {
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-5xl">
       <div className="bg-blue-700 rounded-xl px-8 py-10 mb-10 text-white">
         <p className="text-xs font-semibold uppercase tracking-widest text-blue-200 mb-2">
           EHDS Chapter IV · OMOP CDM v5.4
