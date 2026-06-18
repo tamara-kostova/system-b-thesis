@@ -9,3 +9,7 @@ synthea/output/
 synthea/*.jar
 .RData
 .Rhistory
+apps/web/node_modules
+apps/web/.next
+logs/
+synthea/vocab/

@@ -39,7 +39,7 @@ def search_concepts(
         WHERE ({word_clauses})
           AND (:domain IS NULL OR LOWER(domain_id) = LOWER(:domain))
           AND standard_concept = 'S'
-        ORDER BY concept_name
+        ORDER BY LENGTH(concept_name), concept_name
         LIMIT :limit
     """
     rows = db.execute(text(sql), {"domain": domain, "limit": limit, **word_params})
