@@ -74,6 +74,10 @@ start_service permit_reviewer \
     "$VENV/streamlit" run apps/permit_service/reviewer_ui.py \
         --server.port 8502 --server.headless true --server.address localhost
 
+start_service permit_register \
+    "$VENV/streamlit" run apps/permit_service/register_ui.py \
+        --server.port 8505 --server.headless true --server.address localhost
+
 start_service airlock_reviewer \
     "$VENV/streamlit" run apps/output_airlock/reviewer_ui.py \
         --server.port 8503 --server.headless true --server.address localhost
@@ -110,6 +114,7 @@ echo "  Applicant       http://localhost:8501"
 echo "  Permit Reviewer http://localhost:8502"
 echo "  Airlock Review  http://localhost:8503"
 echo "  LLM Assistant   http://localhost:8504"
+echo "  Permit Register http://localhost:8505  (public, no login)"
 echo ""
 echo "  Logs: tail -f logs/*.log"
 echo "  Stop: ./stop.sh"

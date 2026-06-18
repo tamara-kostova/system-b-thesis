@@ -57,7 +57,7 @@ with tab_apply:
         domains = st.multiselect("Data domains", ["Condition", "Drug", "Measurement", "Visit"],
                                  default=["Condition"])
         concept_ids_raw = st.text_input("Concept IDs (comma-separated integers)",
-                                        placeholder="201826, 316866")
+                                        placeholder="e.g. 201826 (Type 2 Diabetes), 316866 (Hypertension)")
         time_from = st.date_input("Time window from", value=date(2000, 1, 1))
         time_until = st.date_input("Time window until", value=date(2026, 6, 5))
         fmt = st.radio("Data format", ["anonymized", "pseudonymized"])

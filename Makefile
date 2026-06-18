@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-.PHONY: start stop restart status logs db test expire build-spe
+.PHONY: start stop restart status logs db test expire build-spe load-vocab
 
 start:
 	@bash start.sh
@@ -39,3 +39,7 @@ expire:
 
 build-spe:
 	docker build -t system-b-spe:latest -f Dockerfile.spe .
+
+load-vocab:
+	.venv/bin/python sql/load_vocab.py --vocab synthea/vocab/
+	.venv/bin/python sql/load_vocab.py --remap

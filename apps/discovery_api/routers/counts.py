@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from shared.audit import log_event
 from shared.db import get_db
 from shared.suppression import suppress
 
@@ -15,7 +16,7 @@ class CountResult(BaseModel):
     patient_count: int | str  # int or "<10"
 
 
-@router.get("/{concept_id}", response_model=CountResult)
+@router.get("", response_model=CountResult)
 def count_patients(concept_id: int, db: Session = Depends(get_db)):
     """
     Count distinct patients with any condition, drug exposure, or measurement
@@ -46,8 +47,15 @@ def count_patients(concept_id: int, db: Session = Depends(get_db)):
         {"id": concept_id},
     ).scalar()
 
-    return CountResult(
+    result = CountResult(
         concept_id=concept_id,
         concept_name=concept_name,
         patient_count=suppress(count),
     )
+    log_event(
+        event_type="counts.query",
+        actor="anonymous",
+        resource_id=str(concept_id),
+        details={"concept_name": concept_name, "suppressed": result.patient_count == "<10"},
+    )
+    return result

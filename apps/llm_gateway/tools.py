@@ -168,7 +168,7 @@ def execute_tool(name: str, input: dict, allowed_concept_ids: set[int] | None = 
                         "Call search_concept first to obtain a valid concept ID, then retry."
                     )
                 })
-            r = _client.get(f"/counts/{cid}")
+            r = _client.get("/counts", params={"concept_id": cid})
             r.raise_for_status()
             return r.text
         case "lookup_table_schema":
