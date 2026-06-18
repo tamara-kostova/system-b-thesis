@@ -12,6 +12,7 @@ const links = [
   { href: "/spe", label: "My SPEs" },
   { href: "/review", label: "Review" },
   { href: "/register", label: "Register" },
+  { href: "/logs", label: "Audit Log" },
 ];
 
 export default function Nav() {

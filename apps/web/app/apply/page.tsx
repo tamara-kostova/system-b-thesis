@@ -28,7 +28,7 @@ const initialForm: FormState = {
   purpose: "research",
   domains: ["Condition"],
   conceptIds: "",
-  timeFrom: today,
+  timeFrom: "2000-01-01",
   timeUntil: today,
   format: "anonymized",
   pseudoJustification: "",
@@ -208,24 +208,30 @@ export default function ApplyPage() {
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
               />
             </div>
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Time from</label>
-                <input
-                  type="date"
-                  value={form.timeFrom}
-                  onChange={(e) => setForm((f) => ({ ...f, timeFrom: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-                />
-              </div>
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Time until</label>
-                <input
-                  type="date"
-                  value={form.timeUntil}
-                  onChange={(e) => setForm((f) => ({ ...f, timeUntil: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-                />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Data time window
+                <span className="ml-1 text-xs font-normal text-gray-400">(which historical records to include)</span>
+              </label>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-500 mb-1">From</label>
+                  <input
+                    type="date"
+                    value={form.timeFrom}
+                    onChange={(e) => setForm((f) => ({ ...f, timeFrom: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-500 mb-1">Until</label>
+                  <input
+                    type="date"
+                    value={form.timeUntil}
+                    onChange={(e) => setForm((f) => ({ ...f, timeUntil: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  />
+                </div>
               </div>
             </div>
             <div className="flex gap-2">

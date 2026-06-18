@@ -3,7 +3,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from apps.permit_service.models import create_tables
-from apps.permit_service.routers import permits
+from apps.permit_service.routers import permits, audit
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +45,7 @@ app = FastAPI(
 )
 
 app.include_router(permits.router)
+app.include_router(audit.router)
 
 
 @app.get("/health")

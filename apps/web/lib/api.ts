@@ -24,6 +24,22 @@ export interface CountResult {
   patient_count: number | string;
 }
 
+export interface AuditEvent {
+  id: number;
+  ts: string;
+  event_type: string;
+  actor: string;
+  resource_id: string;
+  details: Record<string, unknown>;
+}
+
+export interface AuditPage {
+  total: number;
+  offset: number;
+  limit: number;
+  events: AuditEvent[];
+}
+
 export interface DataScope {
   domains: string[];
   concept_ids: number[];
@@ -98,6 +114,17 @@ export const api = {
   llm: {
     chat: (messages: {role: string; content: string}[], userId = "anonymous") =>
       post<{reply: string; provider: string}>("/api/llm/chat", { messages, user_id: userId }),
+  },
+  audit: {
+    list: (params?: { limit?: number; offset?: number; event_type?: string; actor?: string; resource_id?: string }) => {
+      const p = new URLSearchParams();
+      if (params?.limit !== undefined) p.set("limit", String(params.limit));
+      if (params?.offset !== undefined) p.set("offset", String(params.offset));
+      if (params?.event_type) p.set("event_type", params.event_type);
+      if (params?.actor) p.set("actor", params.actor);
+      if (params?.resource_id) p.set("resource_id", params.resource_id);
+      return get<AuditPage>(`/api/audit/events?${p}`);
+    },
   },
   permits: {
     create: (body: {

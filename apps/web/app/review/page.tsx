@@ -12,6 +12,12 @@ const STATE_STYLES: Record<string, string> = {
   expired: "bg-gray-200 text-gray-500",
 };
 
+function defaultGrantDates() {
+  const from = new Date().toISOString().slice(0, 10);
+  const until = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return { validFrom: from, validUntil: until };
+}
+
 type ActionPanel = { type: "grant" | "refuse"; validFrom: string; validUntil: string; comment: string } | null;
 
 export default function ReviewPage() {
@@ -207,7 +213,7 @@ export default function ReviewPage() {
                         {p.state === "under_review" && !panel && (
                           <>
                             <button
-                              onClick={() => setPanel(p.permit_id, { type: "grant", validFrom: "", validUntil: "", comment: "" })}
+                              onClick={() => setPanel(p.permit_id, { type: "grant", ...defaultGrantDates(), comment: "" })}
                               className="bg-green-600 text-white rounded-lg px-3 py-1.5 text-sm hover:bg-green-700"
                             >
                               Grant

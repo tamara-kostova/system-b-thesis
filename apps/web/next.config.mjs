@@ -18,6 +18,10 @@ const nextConfig = {
         source: "/api/spe/:path*",
         destination: "http://localhost:8004/:path*",
       },
+      {
+        source: "/api/audit/:path*",
+        destination: "http://localhost:8002/audit/:path*",
+      },
     ];
   },
 };
