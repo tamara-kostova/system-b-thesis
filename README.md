@@ -1,25 +1,27 @@
-# System B — SecureHealth Data Access Platform
+# System B - SecureHealth Data Access Platform
 
 A reference implementation of an EHDS (European Health Data Space) Chapter IV-compliant platform for secondary use of health data, with an LLM-assisted prompt interface validated against the OMOP CDM v5.4 standard.
 
 ## Architecture
 
-Five services built in phases:
+Five backend services built in phases, plus a unified Next.js frontend:
 
 | Phase | Service | Port | Description |
 |-------|---------|------|-------------|
 | 1 | `discovery_api` | 8003 | Public catalogue and concept search (FastAPI) |
-| 2 | `permit_service` | 8002 | Data access permit workflow — EHDS Articles 67–68 (FastAPI + Streamlit) |
+| 2 | `permit_service` | 8002 | Data access permit workflow - EHDS Articles 67-68 (FastAPI + Streamlit) |
 | 3 | `spe_provisioner` | 8004 | Isolated JupyterLab environments with no internet egress (Docker) |
 | 4 | `output_airlock` | 8005 | Disclosure checking before results leave the SPE (FastAPI + Streamlit) |
 | 5 | `llm_gateway` | 8006 | LLM-assisted research assistant and in-SPE copilot (FastAPI) |
+| - | `web` | 3001 | Unified Next.js 14 frontend (TypeScript + Tailwind) |
 
 ## Stack
 
 - Python 3.11+, FastAPI, Streamlit, SQLAlchemy, Pydantic
+- Next.js 14, TypeScript, Tailwind CSS (unified web frontend)
 - PostgreSQL 16, Docker
 - LLM: Anthropic Claude / OpenAI / Ollama (configured via `LLM_PROVIDER` env var)
-- Data: synthetic OMOP CDM v5.4 (Eunomia/Synthea)
+- Data: synthetic OMOP CDM v5.4 (Eunomia/Synthea) + ATHENA real vocabulary
 
 ## Setup
 
@@ -54,13 +56,36 @@ After `make start` you'll see:
   Output Airlock  http://localhost:8005   /docs
   LLM Gateway     http://localhost:8006   /docs
 
-  UIs
+  Streamlit UIs
   ─────────────────────────────────────────────────────
   Applicant       http://localhost:8501
   Permit Reviewer http://localhost:8502
   Airlock Review  http://localhost:8503
   LLM Assistant   http://localhost:8504
+  Permit Register http://localhost:8505  (public, no login)
 ```
+
+The unified **Next.js web frontend** runs separately:
+
+```bash
+cd apps/web
+npm install   # first time only
+npm run dev   # starts on http://localhost:3001
+```
+
+| Route | Description |
+|-------|-------------|
+| `/` | Home - platform overview |
+| `/datasets` | Browse available OMOP datasets |
+| `/concepts` | Search OMOP vocabulary concepts with suppressed counts |
+| `/apply` | Submit a data access application (EHDS Article 67) |
+| `/my-applications` | Track your own permit applications |
+| `/register` | Public register of granted permits (EHDS Article 68) |
+| `/spe` | Launch and manage SPE (JupyterLab) environments |
+| `/chat` | LLM discovery assistant (Mode A - no permit required) |
+| `/review` | Reviewer dashboard - start review, grant, refuse |
+
+The web app proxies all API calls through Next.js rewrites (`/api/discovery/*` → port 8003, `/api/permits/*` → 8002, `/api/llm/*` → 8006, `/api/spe/*` → 8004).
 
 ```bash
 make status    # check which services are running
@@ -81,7 +106,7 @@ Copy `.env.example` to `.env` and fill in:
 REVIEWER_PASSWORD=<choose a password for the reviewer UI>
 PROJECTION_SALT=<random string used to pseudonymise person_id>
 
-# LLM provider — pick one
+# LLM provider - pick one
 LLM_PROVIDER=ollama          # local, no API key needed (default)
 # LLM_PROVIDER=anthropic
 # ANTHROPIC_API_KEY=sk-ant-...
@@ -102,11 +127,27 @@ ollama pull llama3.2
 
 ## Data
 
-Uses synthetic patient data only — no real health records. Load OMOP data with:
+Uses synthetic patient data only - no real health records.
+
+### OMOP clinical data (Synthea)
 
 ```bash
 python sql/synthea_to_omop.py --csv synthea/output/csv/
 ```
+
+### ATHENA vocabulary (real OMOP vocab)
+
+Download vocabulary files from [athena.ohdsi.org](https://athena.ohdsi.org), unzip to `synthea/vocab/`, then:
+
+```bash
+# Load CONCEPT, CONCEPT_RELATIONSHIP, CONCEPT_ANCESTOR tables
+make load-vocab
+# or manually:
+python sql/load_vocab.py --vocab synthea/vocab/
+python sql/load_vocab.py --remap   # fix concept_ids in clinical tables
+```
+
+The `--remap` step maps raw SNOMED/RxNorm/LOINC codes stored by the Synthea ETL to proper OMOP standard concept IDs. Run it once after the initial vocab load.
 
 See `sql/` for the full OMOP CDM schema and ETL scripts (Phase 0).
 
