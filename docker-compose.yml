@@ -20,6 +20,69 @@ services:
     profiles:
       - ollama
 
+  # Backend API services (built from Dockerfile.backend)
+  discovery_api:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: systemb-backend:latest
+    command: uvicorn apps.discovery_api.main:app --host 0.0.0.0 --port 8003 --log-level warning
+    depends_on:
+      - postgres
+
+  permit_service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: systemb-backend:latest
+    command: uvicorn apps.permit_service.main:app --host 0.0.0.0 --port 8002 --log-level warning
+    depends_on:
+      - postgres
+
+  spe_provisioner:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: systemb-backend:latest
+    command: uvicorn apps.spe_provisioner.main:app --host 0.0.0.0 --port 8004 --log-level warning
+    depends_on:
+      - postgres
+
+  output_airlock:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: systemb-backend:latest
+    command: uvicorn apps.output_airlock.main:app --host 0.0.0.0 --port 8005 --log-level warning
+    depends_on:
+      - postgres
+
+  llm_gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: systemb-backend:latest
+    command: uvicorn apps.llm_gateway.main:app --host 0.0.0.0 --port 8006 --log-level warning
+    ports:
+      - "8006:8006"
+    depends_on:
+      - postgres
+
+  # Frontend (Next.js)
+  frontend:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    image: systemb-frontend:latest
+    ports:
+      - "3001:3001"
+    depends_on:
+      - discovery_api
+      - permit_service
+      - spe_provisioner
+      - output_airlock
+      - llm_gateway
+
 volumes:
   postgres_data:
   ollama_data:

@@ -43,3 +43,14 @@ build-spe:
 load-vocab:
 	.venv/bin/python sql/load_vocab.py --vocab synthea/vocab/
 	.venv/bin/python sql/load_vocab.py --remap
+
+# Frontend convenience targets
+.PHONY: frontend frontend-install
+
+frontend-install:
+	@echo "Installing frontend dependencies (apps/web)..."
+	cd apps/web && npm ci
+
+frontend:
+	@echo "Starting frontend dev server (apps/web)..."
+	cd apps/web && npm run dev
