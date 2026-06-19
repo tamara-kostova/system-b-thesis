@@ -136,7 +136,7 @@ def teardown(permit_id: str):
         try:
             pg = client.containers.get(POSTGRES_CONTAINER)
             network.disconnect(pg, force=True)
-        except docker.errors.NotFound:
+        except (docker.errors.NotFound, docker.errors.APIError):
             pass
         network.remove()
     except docker.errors.NotFound:
