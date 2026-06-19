@@ -9,69 +9,82 @@ Five backend services built in phases, plus a unified Next.js frontend:
 | Phase | Service | Port | Description |
 |-------|---------|------|-------------|
 | 1 | `discovery_api` | 8003 | Public catalogue and concept search (FastAPI) |
-| 2 | `permit_service` | 8002 | Data access permit workflow - EHDS Articles 67-68 (FastAPI + Streamlit) |
+| 2 | `permit_service` | 8002 | Data access permit workflow - EHDS Articles 67-68 (FastAPI) |
 | 3 | `spe_provisioner` | 8004 | Isolated JupyterLab environments with no internet egress (Docker) |
-| 4 | `output_airlock` | 8005 | Disclosure checking before results leave the SPE (FastAPI + Streamlit) |
+| 4 | `output_airlock` | 8005 | Disclosure checking before results leave the SPE (FastAPI) |
 | 5 | `llm_gateway` | 8006 | LLM-assisted research assistant and in-SPE copilot (FastAPI) |
 | - | `web` | 3001 | Unified Next.js 14 frontend (TypeScript + Tailwind) |
 
 ## Stack
 
-- Python 3.11+, FastAPI, Streamlit, SQLAlchemy, Pydantic
+- Python 3.11+, FastAPI, SQLAlchemy, Pydantic
 - Next.js 14, TypeScript, Tailwind CSS (unified web frontend)
 - PostgreSQL 16, Docker
 - LLM: Anthropic Claude / OpenAI / Ollama (configured via `LLM_PROVIDER` env var)
 - Data: synthetic OMOP CDM v5.4 (Eunomia/Synthea) + ATHENA real vocabulary
 
-## Setup
+## Quick Start (Docker Compose)
+
+### 1. Configure environment
 
 ```bash
-git clone <repo>
-cd system-b-thesis
-
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-
-cp .env.example .env   # edit credentials (see Environment Variables below)
+cp .env.example .env
 ```
 
-## Running the stack
+Edit `.env` and set at minimum:
+
+```
+POSTGRES_PASSWORD=<choose a password>
+REVIEWER_PASSWORD=<choose a password for the reviewer UI>
+PROJECTION_SALT=<random string used to pseudonymise person_id>
+
+# LLM provider - pick one:
+LLM_PROVIDER=anthropic
+ANTHROPIC_API_KEY=sk-ant-...
+# or
+LLM_PROVIDER=openai
+OPENAI_API_KEY=sk-...
+# or (local, no API key needed)
+LLM_PROVIDER=ollama
+```
+
+### 2. Start all services
 
 ```bash
-# Start Postgres
-make db
-
-# Start all APIs and UIs
-make start
+docker compose up -d
 ```
 
-After `make start` you'll see:
+This starts Postgres, all five backend APIs, and the Next.js frontend. The frontend is available at **http://localhost:3001**.
 
-```
-  APIs                           Docs
-  ─────────────────────────────────────────────────────
-  Discovery API   http://localhost:8003   /docs
-  Permit Service  http://localhost:8002   /docs
-  SPE Provisioner http://localhost:8004   /docs
-  Output Airlock  http://localhost:8005   /docs
-  LLM Gateway     http://localhost:8006   /docs
-
-  Streamlit UIs
-  ─────────────────────────────────────────────────────
-  Applicant       http://localhost:8501
-  Permit Reviewer http://localhost:8502
-  Airlock Review  http://localhost:8503
-  LLM Assistant   http://localhost:8504
-  Permit Register http://localhost:8505  (public, no login)
-```
-
-The unified **Next.js web frontend** runs separately:
+### 3. Load data (first run only)
 
 ```bash
-cd apps/web
-npm install   # first time only
-npm run dev   # starts on http://localhost:3001
+# Generate and load synthetic OMOP data
+python sql/synthea_to_omop.py --csv synthea/output/csv/
+
+# Load ATHENA vocabulary (download from athena.ohdsi.org, unzip to synthea/vocab/)
+python sql/load_vocab.py --vocab synthea/vocab/
+python sql/load_vocab.py --remap
 ```
+
+### 4. (Optional) Local Ollama LLM
+
+```bash
+docker compose --profile ollama up -d ollama
+ollama pull llama3.2
+# set LLM_PROVIDER=ollama in .env
+```
+
+### Useful commands
+
+```bash
+docker compose logs -f              # tail all logs
+docker compose logs -f permit_service  # tail one service
+docker compose down                 # stop everything
+docker compose up -d --build        # rebuild images and restart
+```
+
+## Web Frontend Routes
 
 | Route | Description |
 |-------|-------------|
@@ -87,43 +100,33 @@ npm run dev   # starts on http://localhost:3001
 
 The web app proxies all API calls through Next.js rewrites (`/api/discovery/*` → port 8003, `/api/permits/*` → 8002, `/api/llm/*` → 8006, `/api/spe/*` → 8004).
 
-```bash
-make status    # check which services are running
-make logs      # tail all logs (Ctrl+C to stop)
-make stop      # stop everything
-make restart   # stop then start
-make test      # run the test suite
-```
+## Local Development (without Docker)
 
-Logs for each service are written to `logs/<service>.log`.
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+# Start Postgres only
+docker compose up -d postgres
+
+# Run individual services from project root
+uvicorn apps.discovery_api.main:app --reload --port 8003
+uvicorn apps.permit_service.main:app --reload --port 8002
+
+# Frontend
+cd apps/web && npm install && npm run dev
+```
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` and fill in:
-
-```
-# Required
-REVIEWER_PASSWORD=<choose a password for the reviewer UI>
-PROJECTION_SALT=<random string used to pseudonymise person_id>
-
-# LLM provider - pick one
-LLM_PROVIDER=ollama          # local, no API key needed (default)
-# LLM_PROVIDER=anthropic
-# ANTHROPIC_API_KEY=sk-ant-...
-# LLM_PROVIDER=openai
-# OPENAI_API_KEY=sk-...
-
-# Database (defaults work with docker compose)
-# DATABASE_URL=postgresql://omop_admin:changeme@localhost:5433/omop
-```
-
-## Local LLM (no API key)
-
-```bash
-docker compose --profile ollama up -d ollama
-ollama pull llama3.2
-# set LLM_PROVIDER=ollama in .env (this is the default)
-```
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `POSTGRES_PASSWORD` | Yes | PostgreSQL password (used by all services) |
+| `REVIEWER_PASSWORD` | Yes | Password for the reviewer UI |
+| `PROJECTION_SALT` | Yes | Random string for pseudonymising `person_id` |
+| `LLM_PROVIDER` | Yes | `anthropic`, `openai`, or `ollama` |
+| `ANTHROPIC_API_KEY` | If using Anthropic | Anthropic API key |
+| `OPENAI_API_KEY` | If using OpenAI | OpenAI API key |
 
 ## Data
 
@@ -140,22 +143,15 @@ python sql/synthea_to_omop.py --csv synthea/output/csv/
 Download vocabulary files from [athena.ohdsi.org](https://athena.ohdsi.org), unzip to `synthea/vocab/`, then:
 
 ```bash
-# Load CONCEPT, CONCEPT_RELATIONSHIP, CONCEPT_ANCESTOR tables
-make load-vocab
-# or manually:
 python sql/load_vocab.py --vocab synthea/vocab/
 python sql/load_vocab.py --remap   # fix concept_ids in clinical tables
 ```
 
 The `--remap` step maps raw SNOMED/RxNorm/LOINC codes stored by the Synthea ETL to proper OMOP standard concept IDs. Run it once after the initial vocab load.
 
-See `sql/` for the full OMOP CDM schema and ETL scripts (Phase 0).
-
 ## Tests
 
 ```bash
-make test
-# or
 pytest tests/ -v
 ```
 

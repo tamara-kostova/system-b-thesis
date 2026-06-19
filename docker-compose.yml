@@ -1,10 +1,13 @@
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql://omop_admin:${POSTGRES_PASSWORD}@postgres:5432/omop
+
 services:
   postgres:
     image: postgres:16
     environment:
       POSTGRES_DB: omop
       POSTGRES_USER: omop_admin
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5433:5432"
     volumes:
@@ -19,6 +22,86 @@ services:
       - ollama_data:/root/.ollama
     profiles:
       - ollama
+
+  # Backend API services (built from Dockerfile.backend)
+  discovery_api:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: systemb-backend:latest
+    command: uvicorn apps.discovery_api.main:app --host 0.0.0.0 --port 8003 --log-level warning
+    environment:
+      <<: *backend-env
+    depends_on:
+      - postgres
+
+  permit_service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: systemb-backend:latest
+    command: uvicorn apps.permit_service.main:app --host 0.0.0.0 --port 8002 --log-level warning
+    environment:
+      <<: *backend-env
+    depends_on:
+      - postgres
+
+  spe_provisioner:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: systemb-backend:latest
+    command: uvicorn apps.spe_provisioner.main:app --host 0.0.0.0 --port 8004 --log-level warning
+    environment:
+      <<: *backend-env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - postgres
+
+  output_airlock:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: systemb-backend:latest
+    command: uvicorn apps.output_airlock.main:app --host 0.0.0.0 --port 8005 --log-level warning
+    environment:
+      <<: *backend-env
+    depends_on:
+      - postgres
+
+  llm_gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: systemb-backend:latest
+    command: uvicorn apps.llm_gateway.main:app --host 0.0.0.0 --port 8006 --log-level warning
+    environment:
+      <<: *backend-env
+    ports:
+      - "8006:8006"
+    depends_on:
+      - postgres
+
+  # Frontend (Next.js)
+  frontend:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      args:
+        DISCOVERY_API_URL: http://discovery_api:8003
+        PERMIT_SERVICE_URL: http://permit_service:8002
+        LLM_GATEWAY_URL: http://llm_gateway:8006
+        SPE_PROVISIONER_URL: http://spe_provisioner:8004
+    image: systemb-frontend:latest
+    ports:
+      - "3001:3001"
+    depends_on:
+      - discovery_api
+      - permit_service
+      - spe_provisioner
+      - output_airlock
+      - llm_gateway
 
 volumes:
   postgres_data:
