@@ -92,7 +92,9 @@ def find_matching_skills(query: str, limit: int = 3) -> list[Skill]:
 
     scored: list[tuple[int, object]] = []
     for row in rows:
-        kws = {k.lower() for k in (row.trigger_keywords or [])}
+        kws: set[str] = set()
+        for kw in (row.trigger_keywords or []):
+            kws.update(re.findall(r"\w+", kw.lower()))
         overlap = len(kws & words)
         if overlap > 0:
             scored.append((overlap, row))
