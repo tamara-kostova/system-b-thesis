@@ -75,3 +75,11 @@ Every attack attempted against System B, the control that was supposed to catch 
 | No bare SELECT * in SPE | ❌ | ✅ | **Low for small models** |
 
 **Lesson:** Controls enforced purely by system prompt are unreliable for models below ~70B parameters. Production deployment requires code-level enforcement or use of a larger instruction-following model.
+
+---
+
+## Known Limitations — Not Prevented
+
+| # | Attack | Technique | Control | Status |
+|---|--------|-----------|---------|--------|
+| 23 | Differencing attack | Query `count(A OR B)` = 15 (shown) and `count(A)` = `"<10"` (suppressed) → infer count(B) ∈ [6, 15] | Per-query suppression cannot prevent this without linked-count suppression or noise addition | ⚠️ **Known gap** — mitigation out of scope for this thesis. Documented in `tests/test_suppression.py::test_differencing_attack_not_prevented_at_function_level`. Standard OMOP deployments share this limitation. |
