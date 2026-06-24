@@ -13,3 +13,23 @@ include = ["apps*", "shared*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = ["spe_starter.ipynb"]  # names injected by spe_startup.py at kernel start
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# load_dotenv() must precede local imports in these entrypoints
+"apps/output_airlock/main.py" = ["E402"]
+"apps/spe_provisioner/main.py" = ["E402"]
+"apps/spe_provisioner/provisioner.py" = ["E402"]
+"tests/test_airlock_checks.py" = ["E402"]  # os import after env setup
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]

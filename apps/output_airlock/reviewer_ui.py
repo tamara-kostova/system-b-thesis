@@ -5,10 +5,10 @@ Run: cd apps/output_airlock && streamlit run reviewer_ui.py --server.port 8503
 """
 
 import os
-import sys
+from pathlib import Path
+
 import requests
 import streamlit as st
-from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
@@ -26,7 +26,7 @@ if "reviewer" not in st.session_state:
 if not st.session_state.reviewer:
     with st.form("login"):
         name = st.text_input("Reviewer name")
-        pwd  = st.text_input("Password", type="password")
+        pwd = st.text_input("Password", type="password")
         if st.form_submit_button("Login"):
             if pwd == REVIEWER_PASSWORD and name.strip():
                 st.session_state.reviewer = name.strip()
@@ -71,7 +71,7 @@ def _render_submission(s: dict, show_actions: bool = False):
             comment = st.text_area("Comment (required for rejection)")
             c1, c2 = st.columns(2)
             approve = c1.form_submit_button("Approve", type="primary")
-            reject  = c2.form_submit_button("Reject")
+            reject = c2.form_submit_button("Reject")
 
             if approve or reject:
                 endpoint = "approve" if approve else "reject"
@@ -124,17 +124,19 @@ with tab_all:
         st.error(f"Cannot reach airlock service: {e}")
         all_subs = []
 
-    state_filter = st.selectbox("Filter by state", ["all", "pending_review", "approved", "rejected", "blocked"])
-    filtered = all_subs if state_filter == "all" else [s for s in all_subs if s["state"] == state_filter]
+    state_filter = st.selectbox(
+        "Filter by state", ["all", "pending_review", "approved", "rejected", "blocked"]
+    )
+    filtered = (
+        all_subs if state_filter == "all" else [s for s in all_subs if s["state"] == state_filter]
+    )
 
     st.markdown(f"**{len(filtered)} submission(s)**")
     for s in filtered:
         with st.container(border=True):
             _render_submission(s, show_actions=False)
             if s["state"] == "approved":
-                st.markdown(
-                    f"[Download]({AIRLOCK_URL}/submissions/{s['submission_id']}/download)"
-                )
+                st.markdown(f"[Download]({AIRLOCK_URL}/submissions/{s['submission_id']}/download)")
 
     if st.button("Refresh", key="refresh_all"):
         st.rerun()

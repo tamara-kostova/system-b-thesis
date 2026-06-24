@@ -3,9 +3,15 @@ Unit tests for the permit-scoped Postgres projection generator.
 These tests verify the SQL logic without hitting a real database.
 """
 
-from unittest.mock import MagicMock, patch, call
-from apps.spe_provisioner.projection import schema_name, user_name, create_projection, teardown_projection
+from unittest.mock import MagicMock, patch
+
 from apps.permit_service.models import PermitDB
+from apps.spe_provisioner.projection import (
+    create_projection,
+    schema_name,
+    teardown_projection,
+    user_name,
+)
 
 
 def make_permit(fmt="anonymized", domains=None, concept_ids=None):
@@ -13,8 +19,8 @@ def make_permit(fmt="anonymized", domains=None, concept_ids=None):
     p.permit_id = "aaaabbbb-cccc-dddd-eeee-ffffgggghhhh"
     p.format = fmt
     p.data_scope = {
-        "domains":          domains or ["Condition", "Drug"],
-        "concept_ids":      concept_ids or [201826, 316866],
+        "domains": domains or ["Condition", "Drug"],
+        "concept_ids": concept_ids or [201826, 316866],
         "time_window_from": "2020-01-01",
         "time_window_until": "2024-12-31",
     }
@@ -30,6 +36,7 @@ def make_db():
 
 # Schema / user naming
 
+
 def test_schema_name_stable():
     assert schema_name("aaaabbbb-cccc-dddd-eeee-ffffgggghhhh") == "permit_aaaabbbbccccddddeeee"
 
@@ -44,6 +51,7 @@ def test_schema_and_user_different():
 
 
 # SQL generation
+
 
 def _get_executed_sql(db) -> str:
     """Collect all SQL strings passed to db.execute()"""

@@ -8,22 +8,22 @@ EHDS Articles 50 (output checking) and 73 (audit).
 """
 
 import os
-from datetime import datetime, timezone
-from typing import Any
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form
+from datetime import datetime, timezone
+from pathlib import Path
+
+from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from dotenv import load_dotenv
-from pathlib import Path
 
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
-from shared.db import get_db
-from shared.audit import log_event
+from apps.output_airlock.checks import all_passed, run_checks
 from apps.output_airlock.models import AirlockSubmissionDB, create_tables
-from apps.output_airlock.checks import run_checks, all_passed
+from shared.audit import log_event
+from shared.db import get_db
 
 
 @asynccontextmanager
@@ -48,6 +48,7 @@ if not REVIEWER_PASSWORD:
 
 
 # ── Pydantic response models ──────────────────────────────────────────────────
+
 
 class CheckResultOut(BaseModel):
     name: str
@@ -88,6 +89,7 @@ def _to_out(s: AirlockSubmissionDB) -> SubmissionOut:
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
 
 @app.post("/submissions", response_model=SubmissionOut, status_code=201)
 async def submit(
@@ -155,7 +157,9 @@ def approve(submission_id: str, body: ReviewBody, db: Session = Depends(get_db))
     if not s:
         raise HTTPException(404, "Submission not found")
     if s.state != "pending_review":
-        raise HTTPException(400, f"Submission is '{s.state}', only 'pending_review' can be approved")
+        raise HTTPException(
+            400, f"Submission is '{s.state}', only 'pending_review' can be approved"
+        )
 
     s.state = "approved"
     s.reviewer = body.reviewer
@@ -164,8 +168,12 @@ def approve(submission_id: str, body: ReviewBody, db: Session = Depends(get_db))
     db.commit()
     db.refresh(s)
 
-    log_event("airlock.approved", actor=body.reviewer, resource_id=submission_id,
-              details={"filename": s.filename, "comment": body.comment})
+    log_event(
+        "airlock.approved",
+        actor=body.reviewer,
+        resource_id=submission_id,
+        details={"filename": s.filename, "comment": body.comment},
+    )
     return _to_out(s)
 
 
@@ -186,8 +194,12 @@ def reject(submission_id: str, body: ReviewBody, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(s)
 
-    log_event("airlock.rejected", actor=body.reviewer, resource_id=submission_id,
-              details={"filename": s.filename, "comment": body.comment})
+    log_event(
+        "airlock.rejected",
+        actor=body.reviewer,
+        resource_id=submission_id,
+        details={"filename": s.filename, "comment": body.comment},
+    )
     return _to_out(s)
 
 
@@ -199,8 +211,12 @@ def download(submission_id: str, requester: str = "anonymous", db: Session = Dep
     if s.state != "approved":
         raise HTTPException(403, "Only approved submissions can be downloaded")
 
-    log_event("airlock.downloaded", actor=requester, resource_id=submission_id,
-              details={"filename": s.filename})
+    log_event(
+        "airlock.downloaded",
+        actor=requester,
+        resource_id=submission_id,
+        details={"filename": s.filename},
+    )
 
     return Response(
         content=s.file_content,

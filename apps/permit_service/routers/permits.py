@@ -1,18 +1,21 @@
 from datetime import date
 from typing import Literal
-from fastapi import APIRouter, Depends, HTTPException, Header
+
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from shared.db import get_db, _settings as _db_settings
-from shared.audit import log_event
 from apps.permit_service.models import PermitDB
-from apps.permit_service.state_machine import PermitStateMachine, IllegalTransitionError
+from apps.permit_service.state_machine import IllegalTransitionError, PermitStateMachine
+from shared.audit import log_event
+from shared.db import _settings as _db_settings
+from shared.db import get_db
 
 router = APIRouter(prefix="/permits", tags=["permits"])
 
 
 # --- Schemas ---
+
 
 class DataScopeIn(BaseModel):
     domains: list[str]
@@ -87,6 +90,7 @@ def _require_internal_key(x_internal_key: str | None = Header(default=None)):
 def _expire_due(db: Session) -> int:
     """Expire all granted permits whose valid_until is in the past. Returns count expired."""
     from datetime import date as _date
+
     due = (
         db.query(PermitDB)
         .filter(PermitDB.state == "granted", PermitDB.valid_until < _date.today())
@@ -103,6 +107,7 @@ def _expire_due(db: Session) -> int:
 
 
 # --- Endpoints ---
+
 
 @router.post("", response_model=PermitOut, status_code=201)
 def create_permit(body: PermitCreate, db: Session = Depends(get_db)):

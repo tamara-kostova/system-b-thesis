@@ -24,8 +24,8 @@ from shared.audit import log_event
 
 client = docker.from_env()
 
-SPE_IMAGE            = os.getenv("SPE_IMAGE", "system-b-spe:latest")
-POSTGRES_CONTAINER   = os.getenv("POSTGRES_CONTAINER_NAME", "system-b-thesis-postgres-1")
+SPE_IMAGE = os.getenv("SPE_IMAGE", "system-b-spe:latest")
+POSTGRES_CONTAINER = os.getenv("POSTGRES_CONTAINER_NAME", "system-b-thesis-postgres-1")
 POSTGRES_INTERNAL_PORT = 5432
 
 
@@ -34,10 +34,10 @@ def provision(permit_id: str, db_user: str, db_password: str) -> dict:
     Spin up a JupyterLab SPE for a granted permit.
     Returns metadata needed to connect the researcher to the notebook.
     """
-    short     = permit_id.replace("-", "")[:12]
-    net_name  = f"spe-net-{short}"
-    ctr_name  = f"spe-{short}"
-    token     = secrets.token_hex(20)
+    short = permit_id.replace("-", "")[:12]
+    net_name = f"spe-net-{short}"
+    ctr_name = f"spe-{short}"
+    token = secrets.token_hex(20)
 
     # 1. Internal network — no internet egress
     try:
@@ -78,16 +78,16 @@ def provision(permit_id: str, db_user: str, db_password: str) -> dict:
         SPE_IMAGE,
         name=ctr_name,
         detach=True,
-        network="bridge",           # default bridge for host port publishing only
+        network="bridge",  # default bridge for host port publishing only
         environment={
-            "DATABASE_URL":    db_url,
-            "PERMIT_ID":       permit_id,
-            "JUPYTER_TOKEN":   token,
+            "DATABASE_URL": db_url,
+            "PERMIT_ID": permit_id,
+            "JUPYTER_TOKEN": token,
             "LLM_GATEWAY_URL": os.getenv("LLM_GATEWAY_URL", "http://host.docker.internal:8006"),
         },
         # host.docker.internal doesn't auto-resolve on Linux Docker — add it explicitly
         extra_hosts={"host.docker.internal": "host-gateway"},
-        ports={"8888/tcp": None},   # OS picks a free host port
+        ports={"8888/tcp": None},  # OS picks a free host port
         labels={"permit_id": permit_id, "role": "spe"},
     )
 
@@ -97,26 +97,31 @@ def provision(permit_id: str, db_user: str, db_password: str) -> dict:
     container.reload()
     host_port = container.ports["8888/tcp"][0]["HostPort"]
 
-    log_event("spe.started", actor="provisioner", resource_id=permit_id, details={
-        "container": ctr_name,
-        "network":   net_name,
-        "host_port": host_port,
-    })
+    log_event(
+        "spe.started",
+        actor="provisioner",
+        resource_id=permit_id,
+        details={
+            "container": ctr_name,
+            "network": net_name,
+            "host_port": host_port,
+        },
+    )
 
     return {
-        "container_id":   container.id,
+        "container_id": container.id,
         "container_name": ctr_name,
-        "network_id":     network.id,
-        "network_name":   net_name,
-        "host_port":      int(host_port),
-        "jupyter_url":    f"http://localhost:{host_port}?token={token}",
-        "token":          token,
+        "network_id": network.id,
+        "network_name": net_name,
+        "host_port": int(host_port),
+        "jupyter_url": f"http://localhost:{host_port}?token={token}",
+        "token": token,
     }
 
 
 def teardown(permit_id: str):
     """Stop the SPE container and clean up the network."""
-    short    = permit_id.replace("-", "")[:12]
+    short = permit_id.replace("-", "")[:12]
     ctr_name = f"spe-{short}"
     net_name = f"spe-net-{short}"
 
@@ -125,8 +130,12 @@ def teardown(permit_id: str):
         ctr = client.containers.get(ctr_name)
         ctr.stop(timeout=10)
         ctr.remove()
-        log_event("spe.stopped", actor="provisioner", resource_id=permit_id,
-                  details={"container": ctr_name})
+        log_event(
+            "spe.stopped",
+            actor="provisioner",
+            resource_id=permit_id,
+            details={"container": ctr_name},
+        )
     except docker.errors.NotFound:
         pass
 
@@ -144,7 +153,7 @@ def teardown(permit_id: str):
 
 
 def get_status(permit_id: str) -> dict:
-    short    = permit_id.replace("-", "")[:12]
+    short = permit_id.replace("-", "")[:12]
     ctr_name = f"spe-{short}"
     try:
         ctr = client.containers.get(ctr_name)
@@ -152,8 +161,8 @@ def get_status(permit_id: str) -> dict:
         port_bindings = ctr.ports.get("8888/tcp")
         host_port = port_bindings[0]["HostPort"] if port_bindings else None
         return {
-            "status":     ctr.status,
-            "host_port":  host_port,
+            "status": ctr.status,
+            "host_port": host_port,
             "jupyter_url": f"http://localhost:{host_port}" if host_port else None,
         }
     except docker.errors.NotFound:

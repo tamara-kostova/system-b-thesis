@@ -3,30 +3,36 @@ IPython kernel startup for SPE containers.
 Runs automatically on every kernel start — no cell execution needed.
 Provides: engine, pd, available_views, ask_assistant()
 """
+
 import os
+
 import requests
-import pandas as pd
 from sqlalchemy import create_engine, text
 
-PERMIT_ID       = os.environ.get("PERMIT_ID", "unknown")
+PERMIT_ID = os.environ.get("PERMIT_ID", "unknown")
 LLM_GATEWAY_URL = os.environ.get("LLM_GATEWAY_URL", "http://host.docker.internal:8006")
 
 engine = create_engine(os.environ["DATABASE_URL"], future=True)
 
 try:
     with engine.connect() as _conn:
-        _rows = _conn.execute(text(
-            "SELECT table_name FROM information_schema.views "
-            "WHERE table_schema = current_schema()"
-        )).fetchall()
+        _rows = _conn.execute(
+            text(
+                "SELECT table_name FROM information_schema.views "
+                "WHERE table_schema = current_schema()"
+            )
+        ).fetchall()
         available_views = [r[0] for r in _rows]
         view_schemas: dict[str, list[str]] = {}
         for _view in available_views:
-            _cols = _conn.execute(text(
-                "SELECT column_name FROM information_schema.columns "
-                "WHERE table_schema = current_schema() AND table_name = :v "
-                "ORDER BY ordinal_position"
-            ), {"v": _view}).fetchall()
+            _cols = _conn.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_schema = current_schema() AND table_name = :v "
+                    "ORDER BY ordinal_position"
+                ),
+                {"v": _view},
+            ).fetchall()
             view_schemas[_view] = [r[0] for r in _cols]
     print(f"SPE ready — Permit: {PERMIT_ID}")
     print(f"Available views: {available_views}")
@@ -42,11 +48,11 @@ def ask_assistant(question: str) -> str:
         resp = requests.post(
             f"{LLM_GATEWAY_URL}/chat/spe",
             json={
-                "question":        question,
-                "permit_id":       PERMIT_ID,
+                "question": question,
+                "permit_id": PERMIT_ID,
                 "available_views": available_views,
-                "view_schemas":    view_schemas,
-                "user_id":         PERMIT_ID,
+                "view_schemas": view_schemas,
+                "user_id": PERMIT_ID,
             },
             timeout=60,
         )
@@ -55,6 +61,5 @@ def ask_assistant(question: str) -> str:
         return resp.json()["reply"]
     except requests.exceptions.ConnectionError:
         return (
-            "Error: Cannot reach LLM gateway. "
-            "Make sure it is running on the host (port 8006)."
+            "Error: Cannot reach LLM gateway. " "Make sure it is running on the host (port 8006)."
         )

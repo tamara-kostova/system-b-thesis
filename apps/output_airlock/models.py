@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, String, Boolean, LargeBinary, DateTime, Text, JSON
+from sqlalchemy import JSON, Boolean, Column, DateTime, LargeBinary, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 
 from shared.db import Base, engine
@@ -11,19 +11,19 @@ class AirlockSubmissionDB(Base):
     __tablename__ = "submission"
     __table_args__ = {"schema": "airlock"}
 
-    submission_id       = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    permit_id           = Column(String, nullable=False)
-    filename            = Column(String, nullable=False)
-    content_type        = Column(String, nullable=False)
-    file_content        = Column(LargeBinary, nullable=False)
-    justification       = Column(Text, nullable=True)
-    automated_checks    = Column(JSON, nullable=False)   # list of {name, passed, reason}
-    all_checks_passed   = Column(Boolean, nullable=False)
-    state               = Column(String, nullable=False, default="pending_review")
-    reviewer            = Column(String, nullable=True)
-    reviewer_comment    = Column(Text, nullable=True)
-    submitted_at        = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
-    reviewed_at         = Column(DateTime, nullable=True)
+    submission_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    permit_id = Column(String, nullable=False)
+    filename = Column(String, nullable=False)
+    content_type = Column(String, nullable=False)
+    file_content = Column(LargeBinary, nullable=False)
+    justification = Column(Text, nullable=True)
+    automated_checks = Column(JSON, nullable=False)  # list of {name, passed, reason}
+    all_checks_passed = Column(Boolean, nullable=False)
+    state = Column(String, nullable=False, default="pending_review")
+    reviewer = Column(String, nullable=True)
+    reviewer_comment = Column(Text, nullable=True)
+    submitted_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    reviewed_at = Column(DateTime, nullable=True)
 
 
 def create_tables():
