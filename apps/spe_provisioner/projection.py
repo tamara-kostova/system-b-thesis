@@ -15,25 +15,25 @@ not in application code.
 
 import secrets
 import string
+
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from apps.permit_service.models import PermitDB
 
-
 DOMAIN_TABLE = {
-    "Condition":   "condition_occurrence",
-    "Drug":        "drug_exposure",
+    "Condition": "condition_occurrence",
+    "Drug": "drug_exposure",
     "Measurement": "measurement",
 }
 DOMAIN_CONCEPT_COL = {
-    "Condition":   "condition_concept_id",
-    "Drug":        "drug_concept_id",
+    "Condition": "condition_concept_id",
+    "Drug": "drug_concept_id",
     "Measurement": "measurement_concept_id",
 }
 DOMAIN_DATE_COL = {
-    "Condition":   "condition_start_date",
-    "Drug":        "drug_exposure_start_date",
+    "Condition": "condition_start_date",
+    "Drug": "drug_exposure_start_date",
     "Measurement": "measurement_date",
 }
 
@@ -56,14 +56,14 @@ def create_projection(permit: PermitDB, db: Session, salt: str) -> tuple[str, st
     Create a permit-scoped Postgres schema and user.
     Returns (db_user, db_password).
     """
-    schema  = schema_name(permit.permit_id)
-    user    = user_name(permit.permit_id)
+    schema = schema_name(permit.permit_id)
+    user = user_name(permit.permit_id)
     password = _random_password()
-    scope   = permit.data_scope
+    scope = permit.data_scope
     concept_ids = [int(c) for c in scope.get("concept_ids", [])]
-    time_from   = scope.get("time_window_from")
-    time_until  = scope.get("time_window_until")
-    domains     = scope.get("domains", [])
+    time_from = scope.get("time_window_from")
+    time_until = scope.get("time_window_until")
+    domains = scope.get("domains", [])
 
     cids_sql = ", ".join(str(c) for c in concept_ids) if concept_ids else None
 
@@ -93,7 +93,10 @@ def create_projection(permit: PermitDB, db: Session, salt: str) -> tuple[str, st
         patient_subquery = "SELECT NULL::bigint AS person_id WHERE FALSE"
 
     safe_salt = salt.replace("'", "''")
-    person_col = f"md5(person_id::text || '{safe_salt}') AS pseudo_id"
+    if permit.format == "pseudonymized":
+        person_col = f"md5(person_id::text || '{safe_salt}') AS pseudo_id"
+    else:
+        person_col = "NULL::text AS pseudo_id"
 
     stmts = [
         f"CREATE SCHEMA IF NOT EXISTS {schema}",
@@ -110,10 +113,10 @@ END $$""",
     for domain in domains:
         if domain not in DOMAIN_TABLE:
             continue
-        table       = DOMAIN_TABLE[domain]
+        table = DOMAIN_TABLE[domain]
         concept_col = DOMAIN_CONCEPT_COL[domain]
-        date_col    = DOMAIN_DATE_COL[domain]
-        view        = domain.lower() + "s"
+        date_col = DOMAIN_DATE_COL[domain]
+        view = domain.lower() + "s"
 
         concept_filter = (
             f"AND {concept_col} IN (\n"
@@ -121,7 +124,8 @@ END $$""",
             f"        WHERE ancestor_concept_id IN ({cids_sql})\n"
             f"        UNION SELECT unnest(ARRAY[{cids_sql}])\n"
             f"    )"
-            if cids_sql else ""
+            if cids_sql
+            else ""
         )
         stmts.append(f"""CREATE OR REPLACE VIEW {schema}.{view} AS
   SELECT
@@ -149,7 +153,7 @@ END $$""",
 def teardown_projection(permit_id: str, db: Session):
     """Drop the schema and user when the permit expires."""
     schema = schema_name(permit_id)
-    user   = user_name(permit_id)
+    user = user_name(permit_id)
     db.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
     db.execute(text(f"""
         DO $$ BEGIN

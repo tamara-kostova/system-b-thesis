@@ -10,11 +10,12 @@ No state change happens outside this class.
 """
 
 from datetime import date, datetime, timezone
+
 from sqlalchemy.orm import Session
 
+from apps.permit_service.models import PermitDB
 from shared.audit import log_event
 from shared.models import PERMIT_TRANSITIONS as TRANSITIONS
-from apps.permit_service.models import PermitDB
 
 
 class IllegalTransitionError(ValueError):
@@ -57,7 +58,9 @@ class PermitStateMachine:
             )
         self.permit.valid_from = valid_from
         self.permit.valid_until = valid_until
-        self._transition("granted", actor, {"valid_from": str(valid_from), "valid_until": str(valid_until)})
+        self._transition(
+            "granted", actor, {"valid_from": str(valid_from), "valid_until": str(valid_until)}
+        )
 
     def refuse(self, actor: str, comment: str):
         self.permit.reviewer_comment = comment

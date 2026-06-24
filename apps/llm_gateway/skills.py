@@ -79,21 +79,19 @@ def find_matching_skills(query: str, limit: int = 3) -> list[Skill]:
     words = set(re.findall(r"\w+", query.lower()))
     try:
         with engine.connect() as conn:
-            rows = conn.execute(
-                text("""
+            rows = conn.execute(text("""
                     SELECT id, name, description, code, trigger_keywords,
                            created_at, use_count
                     FROM llm_skills
                     ORDER BY use_count DESC
-                """)
-            ).fetchall()
+                """)).fetchall()
     except Exception:
         return []
 
     scored: list[tuple[int, object]] = []
     for row in rows:
         kws: set[str] = set()
-        for kw in (row.trigger_keywords or []):
+        for kw in row.trigger_keywords or []:
             kws.update(re.findall(r"\w+", kw.lower()))
         overlap = len(kws & words)
         if overlap > 0:
@@ -128,16 +126,25 @@ def increment_use_count(skill_id: int) -> None:
 # ── Failure detection ──────────────────────────────────────────────────────────
 
 _FAILURE_PHRASES = [
-    "i don't know", "i dont know",
-    "i'm not sure how", "im not sure how",
-    "i cannot generate", "i can't generate",
-    "i cannot write", "i can't write",
-    "i'm unable to", "im unable to",
-    "i do not have enough", "i don't have enough",
+    "i don't know",
+    "i dont know",
+    "i'm not sure how",
+    "im not sure how",
+    "i cannot generate",
+    "i can't generate",
+    "i cannot write",
+    "i can't write",
+    "i'm unable to",
+    "im unable to",
+    "i do not have enough",
+    "i don't have enough",
     "not sure how to",
-    "i'm afraid i can't", "i'm afraid i cannot",
-    "unfortunately, i cannot", "unfortunately i cannot",
-    "unfortunately, i can't", "unfortunately i can't",
+    "i'm afraid i can't",
+    "i'm afraid i cannot",
+    "unfortunately, i cannot",
+    "unfortunately i cannot",
+    "unfortunately, i can't",
+    "unfortunately i can't",
 ]
 
 _INCOMPLETE_CODE_MARKERS = [

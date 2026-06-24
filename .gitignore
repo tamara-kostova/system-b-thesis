@@ -13,3 +13,7 @@ apps/web/node_modules
 apps/web/.next
 logs/
 synthea/vocab/
+
+# Test documents
+bad_output.csv
+clean_output.csv

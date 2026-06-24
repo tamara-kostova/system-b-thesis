@@ -1,17 +1,20 @@
 """Public Permit Register — EHDS Article 68(4). No login required."""
 
 import os
+from pathlib import Path
+
 import requests
 import streamlit as st
 from dotenv import load_dotenv
-from pathlib import Path
 
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
 PERMIT_SERVICE_URL = os.getenv("PERMIT_SERVICE_URL", "http://localhost:8002")
 
 st.set_page_config(page_title="Permit Register", layout="wide")
 st.title("SecureHealth — Public Permit Register")
-st.caption("All currently granted data access permits. Published in accordance with EHDS Article 68(4).")
+st.caption(
+    "All currently granted data access permits. Published in accordance with EHDS Article 68(4)."
+)
 
 try:
     resp = requests.get(f"{PERMIT_SERVICE_URL}/permits/register")

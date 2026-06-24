@@ -30,31 +30,28 @@ engine = create_engine(DATABASE_URL)
 
 # ATHENA CSV filename → target cdm table (only the tables we have in schema.sql)
 VOCAB_FILES = {
-    "CONCEPT.csv":             "concept",
+    "CONCEPT.csv": "concept",
     "CONCEPT_RELATIONSHIP.csv": "concept_relationship",
-    "CONCEPT_ANCESTOR.csv":    "concept_ancestor",
+    "CONCEPT_ANCESTOR.csv": "concept_ancestor",
 }
 
 # Column name mapping: ATHENA uses uppercase; our schema uses lowercase
 COLUMN_MAP = {
-    "CONCEPT_ID":             "concept_id",
-    "CONCEPT_NAME":           "concept_name",
-    "DOMAIN_ID":              "domain_id",
-    "VOCABULARY_ID":          "vocabulary_id",
-    "CONCEPT_CLASS_ID":       "concept_class_id",
-    "STANDARD_CONCEPT":       "standard_concept",
-    "CONCEPT_CODE":           "concept_code",
-    "VALID_START_DATE":       "valid_start_date",
-    "VALID_END_DATE":         "valid_end_date",
-    "INVALID_REASON":         "invalid_reason",
-    "CONCEPT_ID_1":           "concept_id_1",
-    "CONCEPT_ID_2":           "concept_id_2",
-    "RELATIONSHIP_ID":        "relationship_id",
-    "VALID_START_DATE":       "valid_start_date",
-    "VALID_END_DATE":         "valid_end_date",
-    "INVALID_REASON":         "invalid_reason",
-    "ANCESTOR_CONCEPT_ID":    "ancestor_concept_id",
-    "DESCENDANT_CONCEPT_ID":  "descendant_concept_id",
+    "CONCEPT_ID": "concept_id",
+    "CONCEPT_NAME": "concept_name",
+    "DOMAIN_ID": "domain_id",
+    "VOCABULARY_ID": "vocabulary_id",
+    "CONCEPT_CLASS_ID": "concept_class_id",
+    "STANDARD_CONCEPT": "standard_concept",
+    "CONCEPT_CODE": "concept_code",
+    "VALID_START_DATE": "valid_start_date",
+    "VALID_END_DATE": "valid_end_date",
+    "INVALID_REASON": "invalid_reason",
+    "CONCEPT_ID_1": "concept_id_1",
+    "CONCEPT_ID_2": "concept_id_2",
+    "RELATIONSHIP_ID": "relationship_id",
+    "ANCESTOR_CONCEPT_ID": "ancestor_concept_id",
+    "DESCENDANT_CONCEPT_ID": "descendant_concept_id",
     "MIN_LEVELS_OF_SEPARATION": "min_levels_of_separation",
     "MAX_LEVELS_OF_SEPARATION": "max_levels_of_separation",
 }
@@ -116,10 +113,10 @@ def remap_concept_ids():
     measurement_concept_id: LOINC (vocabulary_id = 'LOINC')
     """
     remaps = [
-        ("condition_occurrence", "condition_concept_id",      "SNOMED"),
+        ("condition_occurrence", "condition_concept_id", "SNOMED"),
         ("condition_occurrence", "condition_source_concept_id", "SNOMED"),
-        ("drug_exposure",        "drug_concept_id",            "RxNorm"),
-        ("measurement",          "measurement_concept_id",     "LOINC"),
+        ("drug_exposure", "drug_concept_id", "RxNorm"),
+        ("measurement", "measurement_concept_id", "LOINC"),
     ]
 
     print("Remapping concept IDs to OMOP standard IDs ...")
@@ -149,8 +146,11 @@ def _print_counts():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Load ATHENA vocabulary into cdm schema")
     parser.add_argument("--vocab", type=Path, help="Path to directory containing ATHENA CSV files")
-    parser.add_argument("--remap", action="store_true",
-                        help="Remap clinical table concept_ids to OMOP standard IDs (run after --vocab)")
+    parser.add_argument(
+        "--remap",
+        action="store_true",
+        help="Remap clinical table concept_ids to OMOP standard IDs (run after --vocab)",
+    )
     args = parser.parse_args()
 
     if args.vocab:

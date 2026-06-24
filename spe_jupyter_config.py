@@ -7,17 +7,17 @@ the SPE provisioner can read them via `docker logs` for the audit trail
 directly to the external audit DB; stdout is the correct mechanism here.
 """
 
-import os
 import json
+import os
 from datetime import datetime, timezone
 
 
 def _audit(event: str, path: str):
     entry = {
-        "ts":        datetime.now(timezone.utc).isoformat(),
-        "event":     event,
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "event": event,
         "permit_id": os.getenv("PERMIT_ID", "unknown"),
-        "path":      path,
+        "path": path,
     }
     print(json.dumps(entry), flush=True)
 
@@ -28,7 +28,9 @@ class AuditHandler:
 
 
 c = get_config()  # noqa: F821 — Jupyter injects this
-c.ServerApp.contents_manager_class = "jupyter_server.services.contents.filemanager.AsyncFileContentsManager"
+c.ServerApp.contents_manager_class = (
+    "jupyter_server.services.contents.filemanager.AsyncFileContentsManager"
+)
 
 _handler = AuditHandler()
 c.ContentsManager.post_save_hook = _handler.post_save

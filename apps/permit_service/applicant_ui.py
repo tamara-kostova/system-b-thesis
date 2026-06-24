@@ -2,10 +2,11 @@
 
 import os
 from datetime import date
+from pathlib import Path
+
 import requests
 import streamlit as st
 from dotenv import load_dotenv
-from pathlib import Path
 
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
 PERMIT_SERVICE_URL = os.getenv("PERMIT_SERVICE_URL", "http://localhost:8002")
@@ -49,23 +50,31 @@ with tab_apply:
         st.stop()
 
     with st.form("application_form"):
-        access_type = st.radio("Access type", ["request", "permit"],
-                               help="Request = aggregated counts only. Permit = full SPE access.")
-        purpose = st.selectbox("Purpose (EHDS Article 53)", [
-            "public_health", "policy", "statistics", "education", "research", "innovation"
-        ])
-        domains = st.multiselect("Data domains", ["Condition", "Drug", "Measurement", "Visit"],
-                                 default=["Condition"])
-        concept_ids_raw = st.text_input("Concept IDs (comma-separated integers)",
-                                        placeholder="e.g. 201826 (Type 2 Diabetes), 316866 (Hypertension)")
+        access_type = st.radio(
+            "Access type",
+            ["request", "permit"],
+            help="Request = aggregated counts only. Permit = full SPE access.",
+        )
+        purpose = st.selectbox(
+            "Purpose (EHDS Article 53)",
+            ["public_health", "policy", "statistics", "education", "research", "innovation"],
+        )
+        domains = st.multiselect(
+            "Data domains", ["Condition", "Drug", "Measurement", "Visit"], default=["Condition"]
+        )
+        concept_ids_raw = st.text_input(
+            "Concept IDs (comma-separated integers)",
+            placeholder="e.g. 201826 (Type 2 Diabetes), 316866 (Hypertension)",
+        )
         time_from = st.date_input("Time window from", value=date(2000, 1, 1))
         time_until = st.date_input("Time window until", value=date(2026, 6, 5))
         fmt = st.radio("Data format", ["anonymized", "pseudonymized"])
         pseudo_justification = None
         if fmt == "pseudonymized":
             pseudo_justification = st.text_area("Justification for pseudonymization (required)")
-        named_users_raw = st.text_input("Named users (comma-separated usernames)",
-                                        placeholder="researcher1, researcher2")
+        named_users_raw = st.text_input(
+            "Named users (comma-separated usernames)", placeholder="researcher1, researcher2"
+        )
         submitted = st.form_submit_button("Submit Application")
 
     if submitted:
@@ -82,26 +91,30 @@ with tab_apply:
         named_users = [u.strip() for u in named_users_raw.split(",") if u.strip()]
 
         try:
-            resp = requests.post(f"{PERMIT_SERVICE_URL}/permits", json={
-                "type": access_type,
-                "holder": st.session_state["username"],
-                "named_users": named_users,
-                "purpose": purpose,
-                "data_scope": {
-                    "domains": domains,
-                    "concept_ids": concept_ids,
-                    "time_window_from": str(time_from),
-                    "time_window_until": str(time_until),
+            resp = requests.post(
+                f"{PERMIT_SERVICE_URL}/permits",
+                json={
+                    "type": access_type,
+                    "holder": st.session_state["username"],
+                    "named_users": named_users,
+                    "purpose": purpose,
+                    "data_scope": {
+                        "domains": domains,
+                        "concept_ids": concept_ids,
+                        "time_window_from": str(time_from),
+                        "time_window_until": str(time_until),
+                    },
+                    "format": fmt,
+                    "pseudonymization_justification": pseudo_justification,
                 },
-                "format": fmt,
-                "pseudonymization_justification": pseudo_justification,
-            })
+            )
             resp.raise_for_status()
             permit_id = resp.json()["permit_id"]
 
-            sub_resp = requests.post(f"{PERMIT_SERVICE_URL}/permits/{permit_id}/submit", json={
-                "actor": st.session_state["username"]
-            })
+            sub_resp = requests.post(
+                f"{PERMIT_SERVICE_URL}/permits/{permit_id}/submit",
+                json={"actor": st.session_state["username"]},
+            )
             sub_resp.raise_for_status()
             st.success(f"Application submitted. ID: `{permit_id}`")
         except requests.HTTPError as e:
@@ -112,7 +125,9 @@ with tab_apply:
 with tab_my:
     st.subheader("My Applications")
     try:
-        resp = requests.get(f"{PERMIT_SERVICE_URL}/permits", params={"holder": st.session_state["username"]})
+        resp = requests.get(
+            f"{PERMIT_SERVICE_URL}/permits", params={"holder": st.session_state["username"]}
+        )
         resp.raise_for_status()
         permits = resp.json()
     except Exception as e:
@@ -123,7 +138,15 @@ with tab_my:
         st.info("No applications yet.")
     else:
         for p in permits:
-            state_color = {"granted": "🟢", "refused": "🔴", "submitted": "🟡",
-                           "under_review": "🔵", "draft": "⚪", "expired": "⚫"}.get(p["state"], "")
-            with st.expander(f"{state_color} {p['permit_id'][:8]}... — {p['purpose']} — {p['state']}"):
+            state_color = {
+                "granted": "🟢",
+                "refused": "🔴",
+                "submitted": "🟡",
+                "under_review": "🔵",
+                "draft": "⚪",
+                "expired": "⚫",
+            }.get(p["state"], "")
+            with st.expander(
+                f"{state_color} {p['permit_id'][:8]}... — {p['purpose']} — {p['state']}"
+            ):
                 st.json(p)

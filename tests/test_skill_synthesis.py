@@ -9,17 +9,18 @@ All LLM calls and DB operations are mocked — no live services required.
 """
 
 import json
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from fastapi.testclient import TestClient
 
 from apps.llm_gateway.main import app
-from apps.llm_gateway.skills import is_spe_failure, Skill
+from apps.llm_gateway.skills import Skill, is_spe_failure
 
 client = TestClient(app)
 
 
 # ── is_spe_failure — pure unit tests (no mocks needed) ───────────────────────
+
 
 def test_failure_detected_on_explicit_refusal():
     assert is_spe_failure("I'm unable to generate this type of analysis.") is True
@@ -62,6 +63,7 @@ def test_no_false_positive_on_short_complete_answer():
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _make_primary_mock(first_reply: str, second_reply: str = "retry code"):
     """Primary LLM that fails on the first call and succeeds on the retry."""
     mock = MagicMock()
@@ -74,18 +76,21 @@ def _make_primary_mock(first_reply: str, second_reply: str = "retry code"):
 
 def _make_synth_mock(skill_name: str = "count_by_year") -> MagicMock:
     """Synthesis LLM that returns a valid skill JSON."""
-    payload = json.dumps({
-        "name": skill_name,
-        "description": "Count records grouped by year.",
-        "trigger_keywords": ["count", "year", "conditions"],
-        "code": f"def {skill_name}(engine, pd, view_name):\n    pass",
-    })
+    payload = json.dumps(
+        {
+            "name": skill_name,
+            "description": "Count records grouped by year.",
+            "trigger_keywords": ["count", "year", "conditions"],
+            "code": f"def {skill_name}(engine, pd, view_name):\n    pass",
+        }
+    )
     mock = MagicMock()
     mock.chat.return_value = MagicMock(content=payload, tool_calls=[])
     return mock
 
 
 # ── Skill synthesis loop ──────────────────────────────────────────────────────
+
 
 def test_synthesis_triggered_when_primary_fails():
     """Primary LLM failure → big LLM synthesizes a skill → retry is returned."""
@@ -95,20 +100,25 @@ def test_synthesis_triggered_when_primary_fails():
     )
     synth = _make_synth_mock()
 
-    with patch("apps.llm_gateway.main.get_provider", return_value=primary), \
-         patch("apps.llm_gateway.main.get_skill_synth_provider", return_value=synth), \
-         patch("apps.llm_gateway.main.find_matching_skills", return_value=[]), \
-         patch("apps.llm_gateway.main.store_skill") as mock_store:
-        resp = client.post("/chat/spe", json={
-            "question": "Count conditions by year",
-            "permit_id": "p-001",
-            "available_views": ["conditions"],
-        })
+    with (
+        patch("apps.llm_gateway.main.get_provider", return_value=primary),
+        patch("apps.llm_gateway.main.get_skill_synth_provider", return_value=synth),
+        patch("apps.llm_gateway.main.find_matching_skills", return_value=[]),
+        patch("apps.llm_gateway.main.store_skill") as mock_store,
+    ):
+        resp = client.post(
+            "/chat/spe",
+            json={
+                "question": "Count conditions by year",
+                "permit_id": "p-001",
+                "available_views": ["conditions"],
+            },
+        )
 
     assert resp.status_code == 200
-    assert primary.chat.call_count == 2          # failure attempt + retry
-    synth.chat.assert_called_once()              # synthesis called once
-    mock_store.assert_called_once()              # new skill persisted
+    assert primary.chat.call_count == 2  # failure attempt + retry
+    synth.chat.assert_called_once()  # synthesis called once
+    mock_store.assert_called_once()  # new skill persisted
     assert resp.json()["reply"] != "I'm unable to generate this code."
 
 
@@ -124,22 +134,27 @@ def test_cached_skill_reused_without_synthesis():
     )
     synth = _make_synth_mock()
 
-    with patch("apps.llm_gateway.main.get_provider", return_value=primary), \
-         patch("apps.llm_gateway.main.get_skill_synth_provider", return_value=synth), \
-         patch("apps.llm_gateway.main.find_matching_skills", return_value=[cached]), \
-         patch("apps.llm_gateway.main.increment_use_count") as mock_inc, \
-         patch("apps.llm_gateway.main.store_skill") as mock_store:
-        resp = client.post("/chat/spe", json={
-            "question": "Count conditions by year",
-            "permit_id": "p-001",
-            "available_views": ["conditions"],
-        })
+    with (
+        patch("apps.llm_gateway.main.get_provider", return_value=primary),
+        patch("apps.llm_gateway.main.get_skill_synth_provider", return_value=synth),
+        patch("apps.llm_gateway.main.find_matching_skills", return_value=[cached]),
+        patch("apps.llm_gateway.main.increment_use_count") as mock_inc,
+        patch("apps.llm_gateway.main.store_skill") as mock_store,
+    ):
+        resp = client.post(
+            "/chat/spe",
+            json={
+                "question": "Count conditions by year",
+                "permit_id": "p-001",
+                "available_views": ["conditions"],
+            },
+        )
 
     assert resp.status_code == 200
-    synth.chat.assert_not_called()               # synthesis skipped — cache hit
-    mock_store.assert_not_called()               # nothing new to store
-    mock_inc.assert_called_once_with(42)         # use_count incremented
-    assert primary.chat.call_count == 2          # retry still happened
+    synth.chat.assert_not_called()  # synthesis skipped — cache hit
+    mock_store.assert_not_called()  # nothing new to store
+    mock_inc.assert_called_once_with(42)  # use_count incremented
+    assert primary.chat.call_count == 2  # retry still happened
 
 
 def test_synthesis_failure_returns_original_reply():
@@ -150,17 +165,22 @@ def test_synthesis_failure_returns_original_reply():
     bad_synth = MagicMock()
     bad_synth.chat.return_value = MagicMock(content="not valid json {{{", tool_calls=[])
 
-    with patch("apps.llm_gateway.main.get_provider", return_value=primary), \
-         patch("apps.llm_gateway.main.get_skill_synth_provider", return_value=bad_synth), \
-         patch("apps.llm_gateway.main.find_matching_skills", return_value=[]), \
-         patch("apps.llm_gateway.main.store_skill"):
-        resp = client.post("/chat/spe", json={
-            "question": "Plot measurements over time",
-            "permit_id": "p-001",
-            "available_views": ["measurements"],
-        })
+    with (
+        patch("apps.llm_gateway.main.get_provider", return_value=primary),
+        patch("apps.llm_gateway.main.get_skill_synth_provider", return_value=bad_synth),
+        patch("apps.llm_gateway.main.find_matching_skills", return_value=[]),
+        patch("apps.llm_gateway.main.store_skill"),
+    ):
+        resp = client.post(
+            "/chat/spe",
+            json={
+                "question": "Plot measurements over time",
+                "permit_id": "p-001",
+                "available_views": ["measurements"],
+            },
+        )
 
-    assert resp.status_code == 200                          # graceful degradation — never 500
+    assert resp.status_code == 200  # graceful degradation — never 500
     assert resp.json()["reply"] == "I'm unable to write this."
 
 
@@ -175,18 +195,23 @@ def test_no_synthesis_when_primary_succeeds():
     primary.chat.return_value = MagicMock(content=valid_code, tool_calls=[])
     synth = _make_synth_mock()
 
-    with patch("apps.llm_gateway.main.get_provider", return_value=primary), \
-         patch("apps.llm_gateway.main.get_skill_synth_provider", return_value=synth), \
-         patch("apps.llm_gateway.main.find_matching_skills") as mock_find:
-        resp = client.post("/chat/spe", json={
-            "question": "Aggregate conditions by year",
-            "permit_id": "p-001",
-            "available_views": ["conditions"],
-        })
+    with (
+        patch("apps.llm_gateway.main.get_provider", return_value=primary),
+        patch("apps.llm_gateway.main.get_skill_synth_provider", return_value=synth),
+        patch("apps.llm_gateway.main.find_matching_skills") as mock_find,
+    ):
+        resp = client.post(
+            "/chat/spe",
+            json={
+                "question": "Aggregate conditions by year",
+                "permit_id": "p-001",
+                "available_views": ["conditions"],
+            },
+        )
 
     assert resp.status_code == 200
-    mock_find.assert_not_called()      # skill lookup never reached
-    synth.chat.assert_not_called()     # synthesis never reached
+    mock_find.assert_not_called()  # skill lookup never reached
+    synth.chat.assert_not_called()  # synthesis never reached
     assert primary.chat.call_count == 1
 
 
@@ -197,12 +222,14 @@ def test_skill_code_injected_into_retry_system_prompt():
 
     synth = MagicMock()
     synth.chat.return_value = MagicMock(
-        content=json.dumps({
-            "name": "my_skill",
-            "description": "test skill",
-            "trigger_keywords": ["test"],
-            "code": skill_code,
-        }),
+        content=json.dumps(
+            {
+                "name": "my_skill",
+                "description": "test skill",
+                "trigger_keywords": ["test"],
+                "code": skill_code,
+            }
+        ),
         tool_calls=[],
     )
 
@@ -219,10 +246,12 @@ def test_skill_code_injected_into_retry_system_prompt():
         return resp
 
     primary.chat.side_effect = None
-    primary.chat = MagicMock(side_effect=[
-        MagicMock(content="I'm unable to generate this code.", tool_calls=[]),
-        MagicMock(content="using skill now", tool_calls=[]),
-    ])
+    primary.chat = MagicMock(
+        side_effect=[
+            MagicMock(content="I'm unable to generate this code.", tool_calls=[]),
+            MagicMock(content="using skill now", tool_calls=[]),
+        ]
+    )
 
     # Intercept the second call to inspect the system prompt
     original_side_effect = list(primary.chat.side_effect)
@@ -237,16 +266,22 @@ def test_skill_code_injected_into_retry_system_prompt():
     intercepting_chat.count = 0
     primary.chat.side_effect = intercepting_chat
 
-    with patch("apps.llm_gateway.main.get_provider", return_value=primary), \
-         patch("apps.llm_gateway.main.get_skill_synth_provider", return_value=synth), \
-         patch("apps.llm_gateway.main.find_matching_skills", return_value=[]), \
-         patch("apps.llm_gateway.main.store_skill"):
-        resp = client.post("/chat/spe", json={
-            "question": "Run my test query",
-            "permit_id": "p-001",
-            "available_views": ["conditions"],
-        })
+    with (
+        patch("apps.llm_gateway.main.get_provider", return_value=primary),
+        patch("apps.llm_gateway.main.get_skill_synth_provider", return_value=synth),
+        patch("apps.llm_gateway.main.find_matching_skills", return_value=[]),
+        patch("apps.llm_gateway.main.store_skill"),
+    ):
+        resp = client.post(
+            "/chat/spe",
+            json={
+                "question": "Run my test query",
+                "permit_id": "p-001",
+                "available_views": ["conditions"],
+            },
+        )
 
     assert resp.status_code == 200
-    assert skill_code in captured_system.get("value", ""), \
-        "Skill code must appear in the retry system prompt"
+    assert skill_code in captured_system.get(
+        "value", ""
+    ), "Skill code must appear in the retry system prompt"

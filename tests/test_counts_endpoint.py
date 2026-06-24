@@ -3,10 +3,13 @@ Integration test: verify the /counts/{concept_id} endpoint applies suppression.
 A bypass in the endpoint layer would not be caught by unit tests on suppress() alone.
 """
 
-import sys, os
+import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from unittest.mock import MagicMock
+
 from fastapi.testclient import TestClient
 
 
@@ -25,7 +28,7 @@ def test_counts_endpoint_suppresses_small_value():
     app.dependency_overrides[get_db] = lambda: mock_db
     try:
         client = TestClient(app)
-        resp = client.get("/counts/201826")
+        resp = client.get("/counts?concept_id=201826")
         assert resp.status_code == 200
         assert resp.json()["patient_count"] == "<10"
     finally:
@@ -40,7 +43,7 @@ def test_counts_endpoint_passes_large_value():
     app.dependency_overrides[get_db] = lambda: mock_db
     try:
         client = TestClient(app)
-        resp = client.get("/counts/201826")
+        resp = client.get("/counts?concept_id=201826")
         assert resp.status_code == 200
         assert resp.json()["patient_count"] == 120
     finally:
@@ -55,7 +58,7 @@ def test_counts_endpoint_suppresses_zero():
     app.dependency_overrides[get_db] = lambda: mock_db
     try:
         client = TestClient(app)
-        resp = client.get("/counts/999")
+        resp = client.get("/counts?concept_id=999")
         assert resp.status_code == 200
         assert resp.json()["patient_count"] == "<10"
     finally:
@@ -70,7 +73,7 @@ def test_counts_endpoint_suppresses_threshold_minus_one():
     app.dependency_overrides[get_db] = lambda: mock_db
     try:
         client = TestClient(app)
-        resp = client.get("/counts/201826")
+        resp = client.get("/counts?concept_id=201826")
         assert resp.status_code == 200
         assert resp.json()["patient_count"] == "<10"
     finally:
@@ -85,7 +88,7 @@ def test_counts_endpoint_passes_at_threshold():
     app.dependency_overrides[get_db] = lambda: mock_db
     try:
         client = TestClient(app)
-        resp = client.get("/counts/201826")
+        resp = client.get("/counts?concept_id=201826")
         assert resp.status_code == 200
         assert resp.json()["patient_count"] == 10
     finally:

@@ -6,18 +6,17 @@ Each test documents an attack and which check catches it.
 """
 
 import json
-import pytest
+
 from apps.output_airlock.checks import (
-    check_csv_small_cells,
+    all_passed,
     check_csv_id_columns,
-    check_image_ocr,
+    check_csv_small_cells,
     check_json_schema,
     run_checks,
-    all_passed,
 )
 
-
 # ── CSV small-cell suppression ────────────────────────────────────────────────
+
 
 def test_csv_small_cell_rejected():
     """Attack: export aggregate counts with a cell value of 3 (reveals < 10 patients)."""
@@ -63,11 +62,10 @@ def test_csv_empty_file_passes():
 
 # ── CSV ID column detection ───────────────────────────────────────────────────
 
+
 def test_csv_pseudo_id_column_rejected():
     """Attack: export pseudo_id with data — reveals linkable patient identifiers."""
-    rows = "\n".join(
-        f"patient_{i:03d},Diabetes,2022-01-01" for i in range(10)
-    )
+    rows = "\n".join(f"patient_{i:03d},Diabetes,2022-01-01" for i in range(10))
     csv = f"pseudo_id,condition,date\n{rows}".encode()
     _, passed, reason = check_csv_id_columns(csv)
     assert not passed
@@ -99,9 +97,13 @@ def test_csv_id_column_with_duplicates_passes():
 
 # ── JSON schema check ─────────────────────────────────────────────────────────
 
+
 def test_json_list_rejected():
     """Attack: export a list of patient records as JSON."""
-    data = [{"patient_id": "abc", "condition": "Diabetes"}, {"patient_id": "def", "condition": "Asthma"}]
+    data = [
+        {"patient_id": "abc", "condition": "Diabetes"},
+        {"patient_id": "def", "condition": "Asthma"},
+    ]
     _, passed, reason = check_json_schema(json.dumps(data).encode())
     assert not passed
     assert "array" in reason.lower()
@@ -136,6 +138,7 @@ def test_json_invalid_rejected():
 
 # ── run_checks dispatch ───────────────────────────────────────────────────────
 
+
 def test_run_checks_csv_dispatches_both():
     csv = b"condition,count\nDiabetes,120"
     results = run_checks("results.csv", csv)
@@ -162,16 +165,19 @@ def test_all_passed_helper():
 # ── Airlock state guard ───────────────────────────────────────────────────────
 
 import os as _os
+
 _os.environ.setdefault("REVIEWER_PASSWORD", "test-password")
 
 
 def test_blocked_submission_cannot_be_approved():
     """Attack: try to approve a submission that failed automated checks."""
-    from fastapi.testclient import TestClient
+    import uuid
     from unittest.mock import MagicMock, patch
+
+    from fastapi.testclient import TestClient
+
     from apps.output_airlock.models import AirlockSubmissionDB
     from shared.db import get_db
-    import uuid
 
     blocked = AirlockSubmissionDB()
     blocked.submission_id = uuid.uuid4()
@@ -183,6 +189,7 @@ def test_blocked_submission_cannot_be_approved():
 
     with patch("apps.output_airlock.main.create_tables"):
         from apps.output_airlock.main import app
+
         app.dependency_overrides[get_db] = lambda: mock_db
         try:
             client = TestClient(app)
@@ -198,11 +205,13 @@ def test_blocked_submission_cannot_be_approved():
 
 def test_non_approved_submission_cannot_be_downloaded():
     """Only approved submissions can be downloaded."""
-    from fastapi.testclient import TestClient
+    import uuid
     from unittest.mock import MagicMock, patch
+
+    from fastapi.testclient import TestClient
+
     from apps.output_airlock.models import AirlockSubmissionDB
     from shared.db import get_db
-    import uuid
 
     sub = AirlockSubmissionDB()
     sub.submission_id = uuid.uuid4()
@@ -214,6 +223,7 @@ def test_non_approved_submission_cannot_be_downloaded():
 
     with patch("apps.output_airlock.main.create_tables"):
         from apps.output_airlock.main import app
+
         app.dependency_overrides[get_db] = lambda: mock_db
         try:
             client = TestClient(app)

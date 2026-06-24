@@ -11,6 +11,7 @@ import csv
 import io
 import json
 import re
+
 from shared.suppression import THRESHOLD
 
 CheckResult = tuple[str, bool, str]
@@ -96,7 +97,11 @@ def check_image_ocr(content: bytes) -> CheckResult:
             )
         return ("image_ocr", True, f"OCR found {len(unique_numbers)} unique numbers (≤ 100)")
     except ImportError:
-        return ("image_ocr", False, "OCR unavailable (pytesseract not installed) — flagged for manual review")
+        return (
+            "image_ocr",
+            False,
+            "OCR unavailable (pytesseract not installed) — flagged for manual review",
+        )
     except Exception as e:
         return ("image_ocr", False, f"OCR check failed ({e}) — flagged for manual review")
 
@@ -146,7 +151,9 @@ def run_checks(filename: str, content: bytes) -> list[CheckResult]:
     elif ext == "json":
         return [check_json_schema(content)]
     else:
-        return [("unknown_format", False, f"Unsupported file type '.{ext}' — manual review required")]
+        return [
+            ("unknown_format", False, f"Unsupported file type '.{ext}' — manual review required")
+        ]
 
 
 def all_passed(results: list[CheckResult]) -> bool:

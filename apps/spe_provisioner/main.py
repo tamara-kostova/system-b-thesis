@@ -1,16 +1,17 @@
 import os
-from fastapi import FastAPI, HTTPException, Depends
+from pathlib import Path
+
+from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from dotenv import load_dotenv
-from pathlib import Path
 
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
-from shared.db import get_db
 from apps.permit_service.models import PermitDB, create_tables
 from apps.spe_provisioner.projection import create_projection, teardown_projection
-from apps.spe_provisioner.provisioner import provision, teardown, get_status
+from apps.spe_provisioner.provisioner import get_status, provision, teardown
+from shared.db import get_db
 
 create_tables()
 

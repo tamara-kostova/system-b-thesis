@@ -7,43 +7,53 @@ See also: redteam/adversarial_prompts.md
 """
 
 import json
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from fastapi.testclient import TestClient
 
-from apps.llm_gateway.main import app, _contains_pii
-from apps.llm_gateway.tools import execute_tool, TOOL_DEFINITIONS, _extract_concept_ids
+from apps.llm_gateway.main import _contains_pii, app
+from apps.llm_gateway.tools import TOOL_DEFINITIONS, _extract_concept_ids, execute_tool
 
 client = TestClient(app)
 
 
 # ── PII guardrail ─────────────────────────────────────────────────────────────
 
+
 def test_pii_us_ssn_rejected():
     """Attack: embed a US Social Security Number in the query."""
-    resp = client.post("/chat", json={
-        "messages": [{"role": "user", "content": "Find records for patient 123-45-6789"}],
-        "user_id": "attacker",
-    })
+    resp = client.post(
+        "/chat",
+        json={
+            "messages": [{"role": "user", "content": "Find records for patient 123-45-6789"}],
+            "user_id": "attacker",
+        },
+    )
     assert resp.status_code == 400
     assert "identifier" in resp.json()["detail"].lower()
 
 
 def test_pii_uk_nin_rejected():
     """Attack: embed a UK National Insurance Number."""
-    resp = client.post("/chat", json={
-        "messages": [{"role": "user", "content": "Patient NI number is AB123456C"}],
-        "user_id": "attacker",
-    })
+    resp = client.post(
+        "/chat",
+        json={
+            "messages": [{"role": "user", "content": "Patient NI number is AB123456C"}],
+            "user_id": "attacker",
+        },
+    )
     assert resp.status_code == 400
 
 
 def test_pii_labeled_bsn_rejected():
     """Attack: embed a Dutch BSN (Burgerservicenummer) with its label."""
-    resp = client.post("/chat", json={
-        "messages": [{"role": "user", "content": "BSN: 123456789"}],
-        "user_id": "attacker",
-    })
+    resp = client.post(
+        "/chat",
+        json={
+            "messages": [{"role": "user", "content": "BSN: 123456789"}],
+            "user_id": "attacker",
+        },
+    )
     assert resp.status_code == 400
 
 
@@ -55,10 +65,13 @@ def test_bare_nine_digit_not_rejected():
 
     with patch("apps.llm_gateway.main.get_provider") as mock_get:
         mock_get.return_value.chat.return_value = mock_response
-        resp = client.post("/chat", json={
-            "messages": [{"role": "user", "content": "Look up person 123456789"}],
-            "user_id": "researcher",
-        })
+        resp = client.post(
+            "/chat",
+            json={
+                "messages": [{"role": "user", "content": "Look up person 123456789"}],
+                "user_id": "researcher",
+            },
+        )
     assert resp.status_code == 200
 
 
@@ -71,10 +84,13 @@ def test_clean_query_not_rejected():
 
     with patch("apps.llm_gateway.main.get_provider") as mock_get:
         mock_get.return_value.chat.return_value = mock_response
-        resp = client.post("/chat", json={
-            "messages": [{"role": "user", "content": "How many patients have diabetes?"}],
-            "user_id": "researcher",
-        })
+        resp = client.post(
+            "/chat",
+            json={
+                "messages": [{"role": "user", "content": "How many patients have diabetes?"}],
+                "user_id": "researcher",
+            },
+        )
     assert resp.status_code == 200
 
 
@@ -90,12 +106,14 @@ def test_pii_detection_function():
 
 # ── Tool guardrails — no row-level data tool ──────────────────────────────────
 
+
 def test_no_row_level_tool_exists():
     """The LLM has no tool that returns individual rows. Verify by inspection."""
     row_keywords = {"select_patients", "get_rows", "fetch_records", "query_data", "run_sql"}
     tool_names = {t["name"] for t in TOOL_DEFINITIONS}
-    assert tool_names.isdisjoint(row_keywords), \
-        f"Row-level tool found in TOOL_DEFINITIONS: {tool_names & row_keywords}"
+    assert tool_names.isdisjoint(
+        row_keywords
+    ), f"Row-level tool found in TOOL_DEFINITIONS: {tool_names & row_keywords}"
 
 
 def test_tools_only_return_aggregates():
@@ -109,12 +127,15 @@ def test_tools_only_return_aggregates():
     # Must not look like a list of patient records
     try:
         parsed = json.loads(result)
-        assert not isinstance(parsed, list), "estimate_count returned a list — potential row-level leak"
+        assert not isinstance(
+            parsed, list
+        ), "estimate_count returned a list — potential row-level leak"
     except json.JSONDecodeError:
         pass  # plain string is fine
 
 
 # ── Concept ID guardrail ───────────────────────────────────────────────────────
+
 
 def test_lookup_table_schema_returns_columns_not_data():
     """lookup_table_schema returns column metadata only, never row data."""
@@ -138,13 +159,17 @@ def test_lookup_unknown_table_returns_error_not_data():
 
 # ── Mode B SPE endpoint ────────────────────────────────────────────────────────
 
+
 def test_spe_pii_rejected():
     """PII in an in-SPE question is blocked by the same guardrail."""
-    resp = client.post("/chat/spe", json={
-        "question": "Analyse patient 123-45-6789",
-        "permit_id": "test-permit",
-        "available_views": ["conditions"],
-    })
+    resp = client.post(
+        "/chat/spe",
+        json={
+            "question": "Analyse patient 123-45-6789",
+            "permit_id": "test-permit",
+            "available_views": ["conditions"],
+        },
+    )
     assert resp.status_code == 400
 
 
@@ -156,27 +181,32 @@ def test_spe_clean_question_passes_guardrail():
 
     with patch("apps.llm_gateway.main.get_provider") as mock_get:
         mock_get.return_value.chat.return_value = mock_response
-        resp = client.post("/chat/spe", json={
-            "question": "Plot condition counts by year",
-            "permit_id": "test-permit",
-            "available_views": ["conditions", "measurements"],
-        })
+        resp = client.post(
+            "/chat/spe",
+            json={
+                "question": "Plot condition counts by year",
+                "permit_id": "test-permit",
+                "available_views": ["conditions", "measurements"],
+            },
+        )
     assert resp.status_code == 200
     assert "provider" in resp.json()
 
 
 # ── Concept ID session allowlist ───────────────────────────────────────────────
 
+
 def test_estimate_count_without_prior_search_is_blocked():
     """estimate_count with an arbitrary concept ID is blocked when allowlist is non-empty."""
     arbitrary_concept_id = 999999
     allowed: set[int] = {201826}  # some other ID was searched
-    result = execute_tool("estimate_count", {"concept_id": arbitrary_concept_id},
-                          allowed_concept_ids=allowed)
-    parsed = json.loads(result)
-    assert "error" in parsed or "not in" in json.dumps(parsed).lower(), (
-        "Expected error when concept ID is not in session allowlist"
+    result = execute_tool(
+        "estimate_count", {"concept_id": arbitrary_concept_id}, allowed_concept_ids=allowed
     )
+    parsed = json.loads(result)
+    assert (
+        "error" in parsed or "not in" in json.dumps(parsed).lower()
+    ), "Expected error when concept ID is not in session allowlist"
 
 
 def test_estimate_count_with_allowlisted_id_is_permitted():
@@ -185,17 +215,18 @@ def test_estimate_count_with_allowlisted_id_is_permitted():
         mock_client.get.return_value.text = '{"count": "42"}'
         mock_client.get.return_value.raise_for_status = MagicMock()
         allowed: set[int] = {201826}
-        result = execute_tool("estimate_count", {"concept_id": 201826},
-                              allowed_concept_ids=allowed)
+        result = execute_tool("estimate_count", {"concept_id": 201826}, allowed_concept_ids=allowed)
     assert "42" in result or "count" in result.lower()
 
 
 def test_extract_concept_ids_from_search_result():
     """_extract_concept_ids pulls concept_id integers from a search result JSON."""
-    payload = json.dumps([
-        {"concept_id": 201826, "concept_name": "Type 2 diabetes"},
-        {"concept_id": 4193704, "concept_name": "Diabetes mellitus"},
-    ])
+    payload = json.dumps(
+        [
+            {"concept_id": 201826, "concept_name": "Type 2 diabetes"},
+            {"concept_id": 4193704, "concept_name": "Diabetes mellitus"},
+        ]
+    )
     ids = _extract_concept_ids(payload)
     assert ids == {201826, 4193704}
 

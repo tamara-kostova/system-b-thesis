@@ -39,6 +39,7 @@ class LLMProvider(ABC):
 class AnthropicProvider(LLMProvider):
     def __init__(self):
         import anthropic
+
         if not settings.anthropic_api_key:
             raise ValueError("ANTHROPIC_API_KEY is not set")
         self._client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
@@ -71,11 +72,13 @@ class AnthropicProvider(LLMProvider):
             if block.type == "text":
                 content_text = block.text
             elif block.type == "tool_use":
-                tool_calls.append({
-                    "id": block.id,
-                    "name": block.name,
-                    "input": block.input,
-                })
+                tool_calls.append(
+                    {
+                        "id": block.id,
+                        "name": block.name,
+                        "input": block.input,
+                    }
+                )
 
         return LLMResponse(content=content_text, tool_calls=tool_calls)
 
@@ -85,6 +88,7 @@ class _OpenAICompatibleProvider(LLMProvider):
 
     def __init__(self, api_key: str, base_url: str | None, model: str):
         from openai import OpenAI
+
         self._client = OpenAI(api_key=api_key or "ollama", base_url=base_url)
         self._model = model
 
@@ -116,11 +120,13 @@ class _OpenAICompatibleProvider(LLMProvider):
         tool_calls = []
         if choice.tool_calls:
             for tc in choice.tool_calls:
-                tool_calls.append({
-                    "id": tc.id,
-                    "name": tc.function.name,
-                    "input": _json.loads(tc.function.arguments),
-                })
+                tool_calls.append(
+                    {
+                        "id": tc.id,
+                        "name": tc.function.name,
+                        "input": _json.loads(tc.function.arguments),
+                    }
+                )
 
         return LLMResponse(content=choice.content or "", tool_calls=tool_calls)
 
@@ -174,6 +180,7 @@ def get_skill_synth_provider() -> LLMProvider:
 def _to_openai_messages(messages: list[dict]) -> list[dict]:
     """Convert internal tool-call format to OpenAI wire format for conversation history."""
     import json
+
     result = []
     for msg in messages:
         if msg.get("role") == "assistant" and msg.get("tool_calls"):
@@ -188,11 +195,13 @@ def _to_openai_messages(messages: list[dict]) -> list[dict]:
                 }
                 for tc in msg["tool_calls"]
             ]
-            result.append({
-                "role": "assistant",
-                "content": msg.get("content") or None,
-                "tool_calls": openai_calls,
-            })
+            result.append(
+                {
+                    "role": "assistant",
+                    "content": msg.get("content") or None,
+                    "tool_calls": openai_calls,
+                }
+            )
         else:
             result.append(msg)
     return result
@@ -207,11 +216,17 @@ def _to_anthropic_messages(messages: list[dict]) -> list[dict]:
             if msg.get("content"):
                 content.append({"type": "text", "text": msg["content"]})
             for tc in msg["tool_calls"]:
-                content.append({"type": "tool_use", "id": tc["id"], "name": tc["name"], "input": tc["input"]})
+                content.append(
+                    {"type": "tool_use", "id": tc["id"], "name": tc["name"], "input": tc["input"]}
+                )
             result.append({"role": "assistant", "content": content})
         elif msg.get("role") == "tool":
             # Merge consecutive tool results into a single user message (Anthropic requirement)
-            tool_result = {"type": "tool_result", "tool_use_id": msg["tool_call_id"], "content": msg["content"]}
+            tool_result = {
+                "type": "tool_result",
+                "tool_use_id": msg["tool_call_id"],
+                "content": msg["content"],
+            }
             if result and result[-1]["role"] == "user" and isinstance(result[-1]["content"], list):
                 result[-1]["content"].append(tool_result)
             else:

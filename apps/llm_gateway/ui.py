@@ -5,10 +5,11 @@ Run: streamlit run apps/llm_gateway/ui.py --server.port 8504
 """
 
 import os
+from pathlib import Path
+
 import requests
 import streamlit as st
 from dotenv import load_dotenv
-from pathlib import Path
 
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
