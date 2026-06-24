@@ -1,5 +1,4 @@
-import pytest
-from shared.suppression import suppress, THRESHOLD
+from shared.suppression import THRESHOLD, suppress
 
 
 def test_exact_threshold_not_suppressed():
@@ -65,8 +64,8 @@ def test_differencing_attack_not_prevented_at_function_level():
     prevent it — this test documents the behaviour explicitly so the
     limitation is acknowledged in the test suite.
     """
-    count_a = suppress(7)       # suppressed
-    count_a_or_b = suppress(15) # not suppressed
+    count_a = suppress(7)  # suppressed
+    count_a_or_b = suppress(15)  # not suppressed
 
     assert count_a == "<10"
     assert count_a_or_b == 15

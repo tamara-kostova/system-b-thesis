@@ -16,7 +16,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import Column, Integer, String, DateTime, JSON
+from sqlalchemy import JSON, Column, DateTime, Integer, String
 from sqlalchemy.orm import Session
 
 from shared.db import Base, engine
@@ -34,12 +34,12 @@ class AuditEvent(Base):
     __tablename__ = "event"
     __table_args__ = {"schema": "audit"}
 
-    id           = Column(Integer, primary_key=True, autoincrement=True)
-    ts           = Column(DateTime(timezone=True), nullable=False)
-    event_type   = Column(String(100), nullable=False)
-    actor        = Column(String(200), nullable=False)
-    resource_id  = Column(String(200), nullable=False)
-    details      = Column(JSON, nullable=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ts = Column(DateTime(timezone=True), nullable=False)
+    event_type = Column(String(100), nullable=False)
+    actor = Column(String(200), nullable=False)
+    resource_id = Column(String(200), nullable=False)
+    details = Column(JSON, nullable=True)
 
 
 def create_audit_schema() -> None:
@@ -69,13 +69,15 @@ def log_event(
 
     if db is not None:
         try:
-            db.add(AuditEvent(
-                ts=ts,
-                event_type=event_type,
-                actor=actor,
-                resource_id=resource_id,
-                details=details or {},
-            ))
+            db.add(
+                AuditEvent(
+                    ts=ts,
+                    event_type=event_type,
+                    actor=actor,
+                    resource_id=resource_id,
+                    details=details or {},
+                )
+            )
             db.flush()
         except Exception as exc:
             logger.error("audit db write failed: %s", exc)

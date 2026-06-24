@@ -4,7 +4,9 @@ can never invent them. All counts go through small-cell suppression.
 """
 
 import json
+
 import httpx
+
 from .config import settings
 
 _client = httpx.Client(base_url=settings.discovery_api_url, timeout=10.0)
@@ -61,7 +63,10 @@ TOOL_DEFINITIONS = [
             "type": "object",
             "properties": {
                 "query": {"type": "string", "description": "Search term, e.g. 'type 2 diabetes'"},
-                "domain": {"type": "string", "description": "Optional domain filter, e.g. 'Drug', 'Condition'"},
+                "domain": {
+                    "type": "string",
+                    "description": "Optional domain filter, e.g. 'Drug', 'Condition'",
+                },
             },
             "required": ["query"],
         },
@@ -153,7 +158,11 @@ def execute_tool(name: str, input: dict, allowed_concept_ids: set[int] | None = 
         case "get_concept_descendants":
             cid = _require_int_concept_id(input)
             if cid is None:
-                return json.dumps({"error": "concept_id must be an integer. Call search_concept first to find the correct concept_id."})
+                return json.dumps(
+                    {
+                        "error": "concept_id must be an integer. Call search_concept first to find the correct concept_id."
+                    }
+                )
             r = _client.get(f"/concepts/{cid}/descendants")
             r.raise_for_status()
             return r.text
@@ -162,12 +171,14 @@ def execute_tool(name: str, input: dict, allowed_concept_ids: set[int] | None = 
             if cid is None:
                 return json.dumps({"error": "concept_id must be a plain integer"})
             if allowed_concept_ids is not None and cid not in allowed_concept_ids:
-                return json.dumps({
-                    "error": (
-                        f"Concept ID {cid} was not returned by search_concept in this session. "
-                        "Call search_concept first to obtain a valid concept ID, then retry."
-                    )
-                })
+                return json.dumps(
+                    {
+                        "error": (
+                            f"Concept ID {cid} was not returned by search_concept in this session. "
+                            "Call search_concept first to obtain a valid concept ID, then retry."
+                        )
+                    }
+                )
             r = _client.get("/counts", params={"concept_id": cid})
             r.raise_for_status()
             return r.text
@@ -179,20 +190,26 @@ def execute_tool(name: str, input: dict, allowed_concept_ids: set[int] | None = 
             return json.dumps({"table": table, "columns": _OMOP_SCHEMA[table]})
         case "draft_application":
             if allowed_concept_ids is not None:
-                not_seen = [c for c in input.get("concept_ids", []) if int(c) not in allowed_concept_ids]
+                not_seen = [
+                    c for c in input.get("concept_ids", []) if int(c) not in allowed_concept_ids
+                ]
                 if not_seen:
-                    return json.dumps({
-                        "error": (
-                            f"Concept IDs {not_seen} have not been returned by search_concept "
-                            "in this session. Call search_concept first to obtain valid IDs."
-                        )
-                    })
+                    return json.dumps(
+                        {
+                            "error": (
+                                f"Concept IDs {not_seen} have not been returned by search_concept "
+                                "in this session. Call search_concept first to obtain valid IDs."
+                            )
+                        }
+                    )
             return _draft_application(**input)
         case _:
             return f"Unknown tool: {name}"
 
 
-def _draft_application(purpose: str, concept_ids: list[int], domains: list[str] | None = None) -> str:
+def _draft_application(
+    purpose: str, concept_ids: list[int], domains: list[str] | None = None
+) -> str:
     lines = [
         f"Purpose: {purpose}",
         f"Requested concept IDs: {concept_ids}",

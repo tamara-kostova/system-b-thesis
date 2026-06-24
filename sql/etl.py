@@ -14,7 +14,6 @@ Usage:
 import argparse
 import os
 import sqlite3
-import sys
 from pathlib import Path
 
 import pandas as pd
@@ -55,8 +54,7 @@ def apply_schema(engine):
 def load_from_sqlite(sqlite_path: str, engine):
     conn = sqlite3.connect(sqlite_path)
     available = {
-        row[0].lower()
-        for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        row[0].lower() for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
     }
 
     for table in ALL_TABLES:
@@ -142,7 +140,7 @@ def main():
     if not args.skip_schema:
         apply_schema(engine)
 
-    print(f"\nLoading data...")
+    print("\nLoading data...")
     if args.sqlite:
         load_from_sqlite(args.sqlite, engine)
     else:

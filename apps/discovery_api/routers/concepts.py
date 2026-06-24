@@ -56,6 +56,7 @@ def get_concept(concept_id: int, db: Session = Depends(get_db)):
     row = db.execute(text(sql), {"concept_id": concept_id}).fetchone()
     if row is None:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404, detail=f"Concept {concept_id} not found")
     return ConceptResult(**row._mapping)
 

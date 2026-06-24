@@ -1,9 +1,11 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
+
 from apps.permit_service.models import create_tables
-from apps.permit_service.routers import permits, audit
+from apps.permit_service.routers import audit, permits
 
 logger = logging.getLogger(__name__)
 
@@ -12,8 +14,9 @@ async def _expiry_loop():
     """Check for expired permits once per hour and expire them automatically."""
     while True:
         await asyncio.sleep(3600)
-        from shared.db import SessionLocal
         from apps.permit_service.routers.permits import _expire_due
+        from shared.db import SessionLocal
+
         db = SessionLocal()
         try:
             n = _expire_due(db)

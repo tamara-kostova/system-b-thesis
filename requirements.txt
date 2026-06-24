@@ -23,6 +23,7 @@ docker>=7.0.0
 
 # Output Airlock
 Pillow>=10.0.0
+pytesseract>=0.3.10  # requires system package: apt install tesseract-ocr
 
 # Dev / test
 pytest>=8.0.0

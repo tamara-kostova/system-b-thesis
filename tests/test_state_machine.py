@@ -1,9 +1,14 @@
-import pytest
 from datetime import date
 from unittest.mock import MagicMock, patch
 
-from apps.permit_service.state_machine import PermitStateMachine, IllegalTransitionError, TRANSITIONS
+import pytest
+
 from apps.permit_service.models import PermitDB
+from apps.permit_service.state_machine import (
+    TRANSITIONS,
+    IllegalTransitionError,
+    PermitStateMachine,
+)
 
 
 def make_permit(state: str) -> PermitDB:
@@ -20,6 +25,7 @@ def make_sm(state: str) -> PermitStateMachine:
 
 
 # Legal transitions
+
 
 def test_draft_can_submit():
     sm = make_sm("draft")
@@ -62,6 +68,7 @@ def test_granted_can_expire():
 
 # Illegal transitions
 
+
 def test_draft_cannot_be_granted_directly():
     with pytest.raises(IllegalTransitionError):
         make_sm("draft").grant("reviewer", date.today(), date.today())
@@ -86,10 +93,18 @@ def test_granted_cannot_be_submitted():
 
 # Verify all defined transitions are tested
 def test_transitions_table_complete():
-    assert set(TRANSITIONS.keys()) == {"draft", "submitted", "under_review", "granted", "refused", "expired"}
+    assert set(TRANSITIONS.keys()) == {
+        "draft",
+        "submitted",
+        "under_review",
+        "granted",
+        "refused",
+        "expired",
+    }
 
 
 # Audit event assertions — a refactor that drops log_event should fail these
+
 
 def test_submit_writes_audit_event():
     with patch("apps.permit_service.state_machine.log_event") as mock_log:
@@ -147,11 +162,13 @@ def test_grant_same_day_valid_from_and_until_is_rejected():
 
 # Expiry automation
 
+
 def test_expire_due_expires_past_permits():
     """_expire_due should expire granted permits with valid_until in the past."""
-    from unittest.mock import patch, MagicMock
-    from apps.permit_service.routers.permits import _expire_due
+    from unittest.mock import MagicMock, patch
+
     from apps.permit_service.models import PermitDB
+    from apps.permit_service.routers.permits import _expire_due
 
     past_permit = PermitDB()
     past_permit.permit_id = "past-permit"
@@ -170,8 +187,9 @@ def test_expire_due_expires_past_permits():
 
 def test_expire_due_skips_when_none_due():
     """_expire_due returns 0 when no permits are past their valid_until."""
-    from apps.permit_service.routers.permits import _expire_due
     from unittest.mock import MagicMock
+
+    from apps.permit_service.routers.permits import _expire_due
 
     db = MagicMock()
     db.query.return_value.filter.return_value.all.return_value = []

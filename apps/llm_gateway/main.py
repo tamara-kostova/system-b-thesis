@@ -7,15 +7,15 @@ Mode B (In-SPE):    called from inside a JupyterLab SPE, generates
 """
 
 import re
-import os
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from shared.audit import log_event
+
 from .config import settings
-from .providers import get_provider, LLMResponse
-from .tools import TOOL_DEFINITIONS, execute_tool, _extract_concept_ids
+from .providers import LLMResponse, get_provider
+from .tools import TOOL_DEFINITIONS, _extract_concept_ids, execute_tool
 
 app = FastAPI(title="LLM Gateway", version="0.1.0")
 
@@ -68,11 +68,11 @@ Always produce complete, runnable code — no placeholder comments like "# load 
 
 # Common national ID patterns: SSN (US), BSN (NL), NIN (UK), CPR (DK), PPS (IE)
 _PII_PATTERNS = [
-    re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),                               # SSN (US)
-    re.compile(r"(?i)\b(?:bsn|burgerservicenummer)\s*[:#=]?\s*\d{9}\b"), # BSN (NL) with label
-    re.compile(r"\b[A-Z]{2}\d{6}[A-Z]\b"),                               # UK NIN
-    re.compile(r"\b\d{6}-\d{4}\b"),                                       # CPR (DK)
-    re.compile(r"\b\d{7}[A-Z]{1,2}\b"),                                   # PPS (IE)
+    re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),  # SSN (US)
+    re.compile(r"(?i)\b(?:bsn|burgerservicenummer)\s*[:#=]?\s*\d{9}\b"),  # BSN (NL) with label
+    re.compile(r"\b[A-Z]{2}\d{6}[A-Z]\b"),  # UK NIN
+    re.compile(r"\b\d{6}-\d{4}\b"),  # CPR (DK)
+    re.compile(r"\b\d{7}[A-Z]{1,2}\b"),  # PPS (IE)
 ]
 
 
@@ -90,6 +90,7 @@ def _check_messages_for_pii(messages: list[dict]) -> str | None:
 
 
 # ── Request / response models ──────────────────────────────────────────────────
+
 
 class ChatRequest(BaseModel):
     messages: list[dict]
@@ -110,6 +111,7 @@ class ChatResponse(BaseModel):
 
 
 # ── Tool loop ──────────────────────────────────────────────────────────────────
+
 
 def _run_tool_loop(
     messages: list[dict],
@@ -134,45 +136,68 @@ def _run_tool_loop(
         except BadRequestError:
             clean = [m for m in messages if m.get("role") in ("user", "system")]
             fallback: LLMResponse = provider.chat(messages=clean, system=system)
-            return fallback.content or "I was unable to complete the tool call. Please rephrase your question."
+            return (
+                fallback.content
+                or "I was unable to complete the tool call. Please rephrase your question."
+            )
 
         if not response.tool_calls:
-            log_event("llm.chat", actor=user_id, resource_id=context, details={
-                "provider": settings.llm_provider,
-                "turns": len(messages),
-            })
+            log_event(
+                "llm.chat",
+                actor=user_id,
+                resource_id=context,
+                details={
+                    "provider": settings.llm_provider,
+                    "turns": len(messages),
+                },
+            )
             return response.content
 
-        messages.append({
-            "role": "assistant",
-            "content": response.content or "",
-            "tool_calls": response.tool_calls,
-        })
+        messages.append(
+            {
+                "role": "assistant",
+                "content": response.content or "",
+                "tool_calls": response.tool_calls,
+            }
+        )
         for tc in response.tool_calls:
-            log_event("llm.tool_call", actor=user_id, resource_id=tc["name"],
-                      details={"input": tc["input"]})
+            log_event(
+                "llm.tool_call",
+                actor=user_id,
+                resource_id=tc["name"],
+                details={"input": tc["input"]},
+            )
             result = execute_tool(tc["name"], tc["input"], allowed_concept_ids=allowed_concept_ids)
             if tc["name"] in ("search_concept", "get_concept_descendants"):
                 allowed_concept_ids.update(_extract_concept_ids(result))
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tc["id"],
-                "content": result,
-            })
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tc["id"],
+                    "content": result,
+                }
+            )
 
     raise HTTPException(500, "Tool loop did not converge")
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 
+
 @app.post("/chat", response_model=ChatResponse)
 def chat(req: ChatRequest):
     """Mode A — public discovery assistant. Calls Phase 1 tools only."""
     pii = _check_messages_for_pii(req.messages)
     if pii:
-        log_event("llm.pii_rejected", actor=req.user_id, resource_id="discovery",
-                  details={"snippet": pii[:80]})
-        raise HTTPException(400, "Message contains what appears to be a patient identifier. Refused.")
+        log_event(
+            "llm.pii_rejected",
+            actor=req.user_id,
+            resource_id="discovery",
+            details={"snippet": pii[:80]},
+        )
+        raise HTTPException(
+            400, "Message contains what appears to be a patient identifier. Refused."
+        )
 
     reply = _run_tool_loop(
         messages=list(req.messages),
@@ -188,25 +213,29 @@ def chat_spe(req: SPEChatRequest):
     """Mode B — in-SPE coding assistant. Generates Python/SQL for permitted views only."""
     pii = _check_messages_for_pii([{"content": req.question}])
     if pii:
-        log_event("llm.pii_rejected", actor=req.user_id, resource_id=req.permit_id,
-                  details={"snippet": req.question[:80]})
-        raise HTTPException(400, "Message contains what appears to be a patient identifier. Refused.")
+        log_event(
+            "llm.pii_rejected",
+            actor=req.user_id,
+            resource_id=req.permit_id,
+            details={"snippet": req.question[:80]},
+        )
+        raise HTTPException(
+            400, "Message contains what appears to be a patient identifier. Refused."
+        )
 
     views_list = ", ".join(req.available_views) if req.available_views else "none"
     schema_lines = "\n".join(
-        f"  {view}: {', '.join(cols)}"
-        for view, cols in req.view_schemas.items()
+        f"  {view}: {', '.join(cols)}" for view, cols in req.view_schemas.items()
     )
-    context_block = (
-        f"Permit: {req.permit_id}\n"
-        f"Available views: {views_list}\n"
-    )
+    context_block = f"Permit: {req.permit_id}\n" f"Available views: {views_list}\n"
     if schema_lines:
         context_block += f"View columns:\n{schema_lines}\n"
-    messages = [{
-        "role": "user",
-        "content": context_block + f"\n{req.question}",
-    }]
+    messages = [
+        {
+            "role": "user",
+            "content": context_block + f"\n{req.question}",
+        }
+    ]
 
     reply = _run_tool_loop(
         messages=messages,

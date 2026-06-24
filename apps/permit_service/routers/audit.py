@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
 from sqlalchemy import desc
+from sqlalchemy.orm import Session
 
 from shared.audit import AuditEvent
 from shared.db import SessionLocal

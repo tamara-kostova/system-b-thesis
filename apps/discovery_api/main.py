@@ -1,5 +1,6 @@
 from fastapi import FastAPI
-from apps.discovery_api.routers import datasets, concepts, counts
+
+from apps.discovery_api.routers import concepts, counts, datasets
 
 app = FastAPI(
     title="Discovery API",
