@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     llm_provider: Literal["anthropic", "openai", "ollama"] = "ollama"
+    # Provider used to synthesize skills when the primary LLM fails
+    skill_synth_provider: Literal["anthropic", "openai", "ollama"] = "anthropic"
 
     # Anthropic
     anthropic_api_key: str = ""

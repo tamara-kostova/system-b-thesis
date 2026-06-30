@@ -14,10 +14,30 @@ from pydantic import BaseModel
 from shared.audit import log_event
 
 from .config import settings
-from .providers import LLMResponse, get_provider
+from .providers import LLMResponse, get_provider, get_skill_synth_provider
+from .skills import (
+    Skill,
+    ensure_skills_table,
+    find_matching_skills,
+    increment_use_count,
+    is_spe_failure,
+    store_skill,
+)
 from .tools import TOOL_DEFINITIONS, _extract_concept_ids, execute_tool
 
 app = FastAPI(title="LLM Gateway", version="0.1.0")
+
+
+@app.on_event("startup")
+def _startup() -> None:
+    ensure_skills_table()
+    provider = get_provider()
+    print(
+        f"[LLM Gateway] primary={settings.llm_provider} model={provider.model}"
+        f" | synth={settings.skill_synth_provider}",
+        flush=True,
+    )
+
 
 # ── System prompts ─────────────────────────────────────────────────────────────
 
@@ -108,6 +128,77 @@ class SPEChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
     provider: str
+
+
+# ── Skill synthesis ───────────────────────────────────────────────────────────
+
+_SKILL_SYNTH_SYSTEM = """You are an expert Python and SQL developer for OMOP CDM health data analysis.
+Your job is to synthesize a reusable skill function when a smaller LLM cannot perform a task.
+
+The target Jupyter kernel has these globals: engine (SQLAlchemy), pd (pandas), available_views (list[str]).
+The function you write will be injected into the smaller LLM's context on its next attempt.
+
+Rules for the generated function:
+- Use: with engine.connect() as conn: df = pd.read_sql(text("SELECT ..."), conn)
+- Always aggregate — never return raw rows without GROUP BY or LIMIT.
+- Parameterize view name(s) and filter values so the function is reusable across permits.
+- Must be self-contained and runnable with only engine and pd in scope.
+
+Respond ONLY with a JSON object — no markdown fences, no extra text."""
+
+
+def _synthesize_skill(
+    question: str,
+    failed_reply: str,
+    schema_info: str,
+    user_id: str,
+    permit_id: str,
+) -> Skill | None:
+    """Ask the skill-synthesis LLM to produce a reusable function for this task."""
+    import json as _json
+
+    prompt = (
+        "A smaller LLM failed to generate analysis code for this health data task.\n\n"
+        f"TASK:\n{question}\n\n"
+        f"FAILED ATTEMPT:\n{failed_reply}\n\n"
+        f"View schema context:\n{schema_info or 'not provided'}\n\n"
+        "Synthesize a reusable Python helper function.\n"
+        "Return ONLY this JSON (no markdown):\n"
+        '{"name": "skill_snake_case", "description": "one sentence", '
+        '"trigger_keywords": ["kw1", "kw2"], "code": "def skill_name(engine, pd, ...):\\n    ..."}'
+    )
+
+    try:
+        synth_provider = get_skill_synth_provider()
+        response = synth_provider.chat(
+            messages=[{"role": "user", "content": prompt}],
+            system=_SKILL_SYNTH_SYSTEM,
+        )
+        raw = response.content.strip()
+        raw = re.sub(r"^```[a-z]*\n?", "", raw)
+        raw = re.sub(r"\n?```$", "", raw.strip())
+        data = _json.loads(raw)
+        skill = Skill(
+            name=data["name"],
+            description=data["description"],
+            code=data["code"],
+            trigger_keywords=data.get("trigger_keywords", []),
+        )
+        log_event(
+            "llm.skill_synthesized",
+            actor=user_id,
+            resource_id=permit_id,
+            details={"skill": skill.name, "synth_provider": settings.skill_synth_provider},
+        )
+        return skill
+    except Exception as exc:
+        log_event(
+            "llm.skill_synthesis_failed",
+            actor=user_id,
+            resource_id=permit_id,
+            details={"error": str(exc)[:200]},
+        )
+        return None
 
 
 # ── Tool loop ──────────────────────────────────────────────────────────────────
@@ -244,6 +335,39 @@ def chat_spe(req: SPEChatRequest):
         context=req.permit_id,
         tools=None,
     )
+
+    if is_spe_failure(reply):
+        skill: Skill | None = None
+        matching = find_matching_skills(req.question)
+        if matching:
+            skill = matching[0]
+            if skill.skill_id is not None:
+                increment_use_count(skill.skill_id)
+            log_event(
+                "llm.skill_applied",
+                actor=req.user_id,
+                resource_id=req.permit_id,
+                details={"skill": skill.name, "source": "cached"},
+            )
+        else:
+            skill = _synthesize_skill(req.question, reply, schema_lines, req.user_id, req.permit_id)
+            if skill:
+                store_skill(skill)
+
+        if skill:
+            augmented_system = (
+                _MODE_B_SYSTEM + "\n\nA helper skill function has been provided for you. "
+                "Call it in your solution — do not redefine it:\n"
+                f"```python\n{skill.code}\n```"
+            )
+            reply = _run_tool_loop(
+                messages=[{"role": "user", "content": context_block + f"\n{req.question}"}],
+                system=augmented_system,
+                user_id=req.user_id,
+                context=req.permit_id,
+                tools=None,
+            )
+
     return ChatResponse(reply=reply, provider=settings.llm_provider)
 
 

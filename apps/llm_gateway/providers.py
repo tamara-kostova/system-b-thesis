@@ -164,6 +164,19 @@ def get_provider() -> LLMProvider:
             raise ValueError(f"Unknown LLM_PROVIDER: {settings.llm_provider!r}")
 
 
+def get_skill_synth_provider() -> LLMProvider:
+    """Return the capable LLM used for skill synthesis (not cached; called only on failure paths)."""
+    match settings.skill_synth_provider:
+        case "anthropic":
+            return AnthropicProvider()
+        case "openai":
+            return OpenAIProvider()
+        case "ollama":
+            return OllamaProvider()
+        case _:
+            return get_provider()
+
+
 def _to_openai_messages(messages: list[dict]) -> list[dict]:
     """Convert internal tool-call format to OpenAI wire format for conversation history."""
     import json
