@@ -1,4 +1,4 @@
-# System B - SecureHealth Data Access Platform
+# SecureHealth Data Access Platform
 
 A reference implementation of an EHDS (European Health Data Space) Chapter IV-compliant platform for secondary use of health data, with an LLM-assisted prompt interface validated against the OMOP CDM v5.4 standard.
 
@@ -24,6 +24,8 @@ Five backend services built in phases, plus a unified Next.js frontend:
 - Data: synthetic OMOP CDM v5.4 (Eunomia/Synthea) + ATHENA real vocabulary
 
 ## Quick Start (Docker Compose)
+
+This is the recommended path. An alternative host-process path (`make start`, launches each service with `uvicorn`/`streamlit` directly instead of in containers) also exists via the `Makefile` - mainly useful if you need the standalone Streamlit UIs (applicant/reviewer/airlock) instead of the unified frontend.
 
 ### 1. Configure environment
 
@@ -84,6 +86,30 @@ docker compose down                 # stop everything
 docker compose up -d --build        # rebuild images and restart
 ```
 
+## Airlock Workflow
+
+Output candidates from an SPE are checked automatically (small-cell suppression, ID-column heuristics), then approved or rejected by a human reviewer. There's no dedicated web UI for this yet - use the API directly:
+
+```bash
+# Submit a candidate output for release
+curl -s -X POST http://localhost:8005/submissions \
+  -F "permit_id=PERMIT-001" \
+  -F "file=@output.csv" \
+  -F "justification=Summary statistics for publication"
+
+# Approve (requires REVIEWER_PASSWORD from .env)
+curl -s -X POST http://localhost:8005/submissions/<submission_id>/approve \
+  -H "Content-Type: application/json" \
+  -d '{"password": "<REVIEWER_PASSWORD>"}'
+
+# Reject
+curl -s -X POST http://localhost:8005/submissions/<submission_id>/reject \
+  -H "Content-Type: application/json" \
+  -d '{"password": "<REVIEWER_PASSWORD>"}'
+```
+
+Submissions that fail the automated checks cannot be approved regardless of reviewer input.
+
 ## Web Frontend Routes
 
 | Route | Description |
@@ -128,6 +154,8 @@ cd apps/web && npm install && npm run dev
 | `ANTHROPIC_API_KEY` | If using Anthropic | Anthropic API key |
 | `OPENAI_API_KEY` | If using OpenAI | OpenAI API key |
 
+Additional optional variables (service URLs, model names, `INTERNAL_API_KEY`, etc.) have working defaults and are documented directly in `.env.example`.
+
 ## Data
 
 Uses synthetic patient data only - no real health records.
@@ -169,3 +197,5 @@ Key test files for thesis evaluation:
 ## EHDS Compliance
 
 See `docs/ehds_mapping.md` for the full Article → implementation mapping.
+
+![Repo Card](https://gh-card.dev/repos/tamara-kostova/system-b-thesis.svg)
