@@ -160,10 +160,23 @@ def get_status(permit_id: str) -> dict:
         ctr.reload()
         port_bindings = ctr.ports.get("8888/tcp")
         host_port = port_bindings[0]["HostPort"] if port_bindings else None
+
+        token = None
+        for env in ctr.attrs.get("Config", {}).get("Env", []):
+            if env.startswith("JUPYTER_TOKEN="):
+                token = env.split("=", 1)[1]
+                break
+
+        jupyter_url = None
+        if host_port:
+            jupyter_url = f"http://localhost:{host_port}"
+            if token:
+                jupyter_url += f"?token={token}"
+
         return {
             "status": ctr.status,
             "host_port": host_port,
-            "jupyter_url": f"http://localhost:{host_port}" if host_port else None,
+            "jupyter_url": jupyter_url,
         }
     except docker.errors.NotFound:
         return {"status": "not_found", "host_port": None, "jupyter_url": None}

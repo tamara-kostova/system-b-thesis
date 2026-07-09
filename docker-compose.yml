@@ -1,5 +1,8 @@
 x-backend-env: &backend-env
   DATABASE_URL: postgresql://omop_admin:${POSTGRES_PASSWORD}@postgres:5432/omop
+  DISCOVERY_API_URL: http://discovery_api:8003
+  PERMIT_SERVICE_URL: http://permit_service:8002
+  OLLAMA_BASE_URL: http://ollama:11434
 
 services:
   postgres:
